@@ -5,6 +5,9 @@
     const VERSION = "__PLIB_VERSION__";
     let cfg = __PLIB_SETTINGS__;
     let library = [];
+    let collections = null;          // null = Reference Library not available (all collection UI hidden)
+    let collById = new Map();        // id -> {id, name, count}
+    let lastRevision = null;
     const log = (...a) => console.log("[Prompt Library]", ...a);
     const I18N = {
         en: {
@@ -27,6 +30,13 @@
             clear: "Clear",
             save_current_title: "Save the current prompt to the library",
             keys_hint: "↑↓ to move · Enter to insert · Esc to close",
+            collections: "Collections",
+            coll_linked: "Linked collection: {names}",
+            coll_load: "Load collection {name}",
+            coll_loading: "Loading collection «{name}»…",
+            coll_prompts: "Prompts linked to «{name}»:",
+            use_prompt: "Use «{title}»",
+            prompt_missing: "Prompt not found in the library",
         },
         es: {
             search_ph: "Buscar prompts…",
@@ -48,6 +58,13 @@
             clear: "Borrar",
             save_current_title: "Guardar el prompt actual en la librería",
             keys_hint: "↑↓ para moverte · Enter para insertar · Esc para cerrar",
+            collections: "Colecciones",
+            coll_linked: "Colección asociada: {names}",
+            coll_load: "Cargar colección {name}",
+            coll_loading: "Cargando colección «{name}»…",
+            coll_prompts: "Prompts asociados a «{name}»:",
+            use_prompt: "Usar «{title}»",
+            prompt_missing: "No se encontró el prompt en la librería",
         },
     };
     const browserLang = () => String(navigator.language || (navigator.languages && navigator.languages[0]) || "");
@@ -84,6 +101,7 @@
 .plib-clear:hover { color: var(--body-text-color); background: var(--background-fill-secondary); }
 .plib-clear.show { display: flex; }
 .plib-clear svg { width: 10px; height: 10px; }
+:root { --plib-icon-images: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='5' width='18' height='14' rx='2' fill='none' stroke='black' stroke-width='2.4'/%3E%3Cpath d='M5 17l5-5 4 4 2-2 3 3' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='15.5' cy='9.5' r='1.6' fill='black'/%3E%3C/svg%3E"); }
 :root { --plib-icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5' fill='none' stroke='black' stroke-width='2.4'/%3E%3Cpath d='M15.5 15.5L21 21' stroke='black' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
 /* ---- DOM-only fallback bar (only used if the Gradio bar could not be inserted) */
 .plib-wrap.plib-fallback { display: flex; gap: 6px; align-items: center; margin: 6px 0; padding: 4px; border-radius: var(--block-radius);
@@ -111,6 +129,10 @@
 .plib-item-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .plib-chip { font-size: 11px; line-height: 1.5; padding: 0 7px; border-radius: 999px; background: var(--plib-chip-bg); color: var(--plib-subdued);
   border: 1px solid var(--plib-border); white-space: nowrap; }
+.plib-chip.plib-coll-chip { color: var(--plib-fg); background: var(--plib-hover); border-color: var(--plib-accent);
+  display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.plib-coll-chip::before { content: ""; width: 10px; height: 10px; flex: none; background: currentColor; opacity: .85;
+  -webkit-mask: var(--plib-icon-images) center / contain no-repeat; mask: var(--plib-icon-images) center / contain no-repeat; }
 .plib-item-snip { margin-top: 4px; font-size: 12px; line-height: 1.4; color: var(--plib-subdued); overflow: hidden; display: -webkit-box;
   -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
 .plib-hl { background: var(--plib-hl-bg); color: var(--plib-fg); border-radius: 3px; padding: 0 1px; font-weight: 600; }
@@ -128,6 +150,9 @@
 .plib-toast.hiding { opacity: 0; }
 .plib-toast button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,.2); font-weight: 700; white-space: nowrap; }
 .plib-toast button:hover { background: rgba(255,255,255,.32); }
+.plib-toast[data-kind="offer"] { background: #1f2937; border: 1px solid var(--color-accent, #2563eb); flex-wrap: wrap; justify-content: center; }
+.plib-toast[data-kind="offer"] button { background: var(--color-accent, #2563eb); }
+.plib-toast[data-kind="offer"] button:hover { filter: brightness(1.12); background: var(--color-accent, #2563eb); }
 /* ---- dialogs (template variables, save current) */
 .plib-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 10090; display: flex; align-items: center; justify-content: center; }
 .plib-modal { background: var(--plib-bg); color: var(--plib-fg); border: 1px solid var(--plib-border); border-radius: var(--plib-radius, 8px);
@@ -215,13 +240,15 @@
             const title = fold(item.title);
             const tags = fold((item.tags || []).join(" ") + " " + (item.category || ""));
             const body = fold(item.text);
-            const all = `${title} ${tags} ${body}`;
+            const colls = fold(linkedCollections(item).map(c => c.name).join(" "));
+            const all = `${title} ${tags} ${colls} ${body}`;
             if (words.length && !words.every(w => all.includes(w))) continue;
             const titleHits = words.reduce((n, w) => n + (title.includes(w) ? 1 : 0), 0);
             const tagHits = words.reduce((n, w) => n + (tags.includes(w) ? 1 : 0), 0);
+            const collHits = words.reduce((n, w) => n + (colls.includes(w) ? 1 : 0), 0);
             const bodyHits = words.reduce((n, w) => n + (body.includes(w) ? 1 : 0), 0);
             scored.push({
-                rank: [-titleHits * 100 - tagHits * 40 - bodyHits * 10, -(item.last_used || 0), -(item.use_count || 0), -(item.updated || 0)],
+                rank: [-titleHits * 100 - tagHits * 40 - collHits * 30 - bodyHits * 10, -(item.last_used || 0), -(item.use_count || 0), -(item.updated || 0)],
                 item,
             });
         }
@@ -230,6 +257,11 @@
             return fold(a.item.title).localeCompare(fold(b.item.title));
         });
         return scored.slice(0, limit).map(s => s.item);
+    }
+    function linkedCollections(item) {
+        // Only collections Reference Library lists right now (unknown / trashed ids are ignored, never shown).
+        if (!collections || !item || !Array.isArray(item.collections)) return [];
+        return item.collections.map(id => collById.get(id)).filter(Boolean);
     }
     function snippet(item, query, maxLen = 110) {
         const text = String(item.text || "").replace(/\n/g, " ").trim();
@@ -265,9 +297,9 @@
         if (!box) { box = document.createElement("div"); box.className = "plib-toasts"; document.body.appendChild(box); }
         return box;
     }
-    function toast(text, kind, buttons) {
+    function toast(text, kind, buttons, opts = {}) {
         if (!text) return;
-        if (kind !== "error" && cfg.toasts === false) return;
+        if (kind !== "error" && cfg.toasts === false && !opts.force) return;
         const el = document.createElement("div");
         el.className = "plib-toast";
         el.dataset.kind = kind || "ok";
@@ -281,8 +313,9 @@
             el.appendChild(btn);
         }
         ensureToasts().appendChild(el);
-        const ms = Math.max(1000, Math.min(30000, Number(cfg.toast_ms) || 3500));
+        const ms = Math.max(opts.minMs || 1000, Math.min(30000, Number(cfg.toast_ms) || 3500));
         setTimeout(() => { el.classList.add("hiding"); setTimeout(() => el.remove(), 350); }, ms);
+        return el;
     }
 
     // ------------------------------------------------------------------ Gradio bridge
@@ -337,13 +370,15 @@
             try { data = JSON.parse(raw); } catch (_) { return; }
         }
         if (!data || typeof data !== "object") return;
-        if (data.library) applyLibrary({ prompts: data.library });
+        if (data.library) applyLibrary({ prompts: data.library, collections: data.collections, revision: data.revision, change: data.change });
         const entry = data.id != null ? pending.get(data.id) : null;
         if (entry) {
             clearTimeout(entry.timer);
             pending.delete(data.id);
             entry.resolve(data);
         }
+        const offer = data.id != null ? offers.get(data.id) : null;
+        if (offer) offers.delete(data.id);
         if (data.ok === false) toast(data.error || "error", "error");
         else if (data.toast) {
             const buttons = [];
@@ -353,8 +388,99 @@
                     onClick: () => sendBridge({ action: "undo", tab: data.tab || activeTab(), undo_id: data.undo_id }).catch(() => {}),
                 });
             }
-            toast(data.toast, "ok", buttons);
+            const linked = offer ? collectionAction(offer) : null;
+            if (linked && linked.buttons.length) {
+                // "offer": one toast with the insert message, Undo and "Load collection X" (kept on screen longer).
+                toast(data.toast + "\n" + linked.text, "offer", buttons.concat(linked.buttons), { force: true, minMs: 9000 });
+            } else {
+                toast(data.toast, "ok", buttons);
+            }
         }
+    }
+
+    // ------------------------------------------------------------------ Reference Library link
+    const offers = new Map(); // req_id -> picked item (collection offer after the insert succeeds)
+    function applyCollection(c) {
+        // Contract: Reference Library listens for this and loads the collection into Reference Images.
+        window.dispatchEvent(new CustomEvent("reflib:apply", { detail: { id: c.id } }));
+    }
+    function collectionAction(item) {
+        const linked = linkedCollections(item);
+        const mode = cfg.on_pick_collection || "offer";
+        if (!linked.length || mode === "none") return null;
+        if (mode === "auto") {
+            applyCollection(linked[0]);
+            toast(t("coll_loading", { name: linked[0].name }), "info");
+            return null;
+        }
+        return {
+            text: t("coll_linked", { names: linked.map(c => c.name).join(", ") }),
+            buttons: linked.slice(0, 3).map(c => ({ label: t("coll_load", { name: c.name }), onClick: () => applyCollection(c) })),
+        };
+    }
+    async function applyPromptById(id, opts = {}) {
+        // Used by the promptlib:apply event (Reference Library offering a linked prompt) and by our own offers.
+        let item = library.find(p => p.id === id);
+        if (!item) { await syncLibrary(); item = library.find(p => p.id === id); }
+        if (!item) { toast(t("prompt_missing"), "error"); return false; }
+        let vars = null;
+        if (item.vars && item.vars.length) {
+            vars = await askVariables(item);
+            if (vars === null) return false;
+        }
+        const tab = opts.tab || activeTab();
+        const mode = ["replace", "append", "cursor"].includes(opts.mode) ? opts.mode : (cfg.insert_mode || "replace");
+        const reqId = Math.random().toString(16).slice(2);
+        if (opts.offerCollections) offers.set(reqId, item);
+        try {
+            const r = await sendBridge({
+                req_id: reqId, action: "insert", tab, field: fieldOf(visiblePromptRoot(tab)), id: item.id, mode,
+                cursor: mode === "cursor" ? cursorOf(tab) : null, current: readPromptValue(tab), vars: vars || undefined,
+            });
+            if (r && r.ok) window.dispatchEvent(new CustomEvent("promptlib:applied", { detail: { id: item.id, title: item.title, source: opts.source || null } }));
+            return !!(r && r.ok);
+        } catch (e) {
+            offers.delete(reqId);
+            toast(String(e.message || e), "error");
+            return false;
+        }
+    }
+    window.addEventListener("promptlib:apply", (e) => {
+        const d = (e && e.detail) || {};
+        if (!d.id) return;
+        // Coming from Reference Library: do not offer to load a collection back (it was just loaded).
+        applyPromptById(String(d.id), { mode: d.mode, source: d.source || "event", offerCollections: d.offerCollections === true });
+    });
+    window.addEventListener("reflib:applied", (e) => {
+        const d = (e && e.detail) || {};
+        if (!d.id || cfg.on_reflib_applied !== "offer" || !collections) return; // default "none": Reference Library offers
+        const linked = library.filter(p => Array.isArray(p.collections) && p.collections.includes(d.id));
+        if (!linked.length) return;
+        const name = d.name || (collById.get(d.id) || {}).name || "";
+        toast(t("coll_prompts", { name }), "offer",
+            linked.slice(0, 3).map(p => ({ label: t("use_prompt", { title: p.title }), onClick: () => applyPromptById(p.id, { source: "reflib-offer" }) })),
+            { force: true, minMs: 9000 });
+    });
+    let reflibTimer = null;
+    window.addEventListener("reflib:changed", () => {
+        clearTimeout(reflibTimer);
+        reflibTimer = setTimeout(() => { const b = document.getElementById("plib_reflib_refresh"); if (b) b.click(); }, 250);
+    });
+    function syncLibrary() {
+        return new Promise((resolve) => {
+            const b = document.getElementById("plib_sync");
+            if (!b) return resolve();
+            const before = lastRevision;
+            b.click();
+            let n = 0;
+            const iv = setInterval(() => { if (lastRevision !== before || ++n > 20) { clearInterval(iv); resolve(); } }, 100);
+        });
+    }
+    function onRevision(raw) {
+        const rev = Number(raw);
+        if (!Number.isFinite(rev) || rev === lastRevision) return;
+        const b = document.getElementById("plib_sync");
+        if (b) b.click();
     }
 
     // ------------------------------------------------------------------ prompt field discovery
@@ -549,7 +675,8 @@
             return;
         }
         state.dd.innerHTML = results.map((item, i) => {
-            const chips = (item.tags || []).slice(0, 8).map(tag => `<span class="plib-chip">${escapeHtml(tag)}</span>`).join("");
+            const chips = linkedCollections(item).slice(0, 4).map(c => `<span class="plib-chip plib-coll-chip" title="${escapeHtml(t("collections"))}">${escapeHtml(c.name)}</span>`).join("")
+                + (item.tags || []).slice(0, 8).map(tag => `<span class="plib-chip">${escapeHtml(tag)}</span>`).join("");
             const snip = highlightHtml(snippet(item, q, 220));
             return `<div class="plib-item${i === state.activeIdx ? " active" : ""}" data-i="${i}" role="option" title="${escapeHtml(item.title)}">
               <div class="plib-item-head"><div class="plib-item-title">${highlightHtml(titleHl(item.title, q))}</div></div>
@@ -625,8 +752,11 @@
         }
         const mode = cfg.insert_mode || "replace";
         const field = fieldOf(visiblePromptRoot(tab));
+        const reqId = Math.random().toString(16).slice(2);
+        offers.set(reqId, item);
         try {
             await sendBridge({
+                req_id: reqId,
                 action: "insert",
                 tab,
                 field,
@@ -637,6 +767,7 @@
                 vars: vars || undefined,
             });
         } catch (e) {
+            offers.delete(reqId);
             toast(String(e.message || e), "error");
         }
     }
@@ -763,11 +894,25 @@
         if (fromServer) log("settings applied", cfg);
     }
     function applyLibrary(raw) {
-        try {
-            const data = typeof raw === "string" ? JSON.parse(raw) : raw;
-            if (Array.isArray(data)) library = data;
-            else if (data && Array.isArray(data.prompts)) library = data.prompts;
-        } catch (_) {}
+        let data = null;
+        try { data = typeof raw === "string" ? JSON.parse(raw) : raw; } catch (_) { return; }
+        if (Array.isArray(data)) { library = data; return; }
+        if (!data || typeof data !== "object") return;
+        if (Array.isArray(data.prompts)) library = data.prompts;
+        if ("collections" in data) {
+            collections = Array.isArray(data.collections) ? data.collections : null;
+            collById = new Map((collections || []).map(c => [c.id, c]));
+        }
+        if (data.revision != null) {
+            const rev = Number(data.revision);
+            const changed = lastRevision !== null && rev !== lastRevision;
+            lastRevision = rev;
+            if (changed) {
+                const ch = data.change || {};
+                // Contract: tell other plugins (Reference Library) that prompts or links changed.
+                window.dispatchEvent(new CustomEvent("promptlib:changed", { detail: { revision: rev, reason: ch.reason || null, id: ch.id || null } }));
+            }
+        }
     }
     function refreshMounts() {
         const tab = activeTab();
@@ -793,6 +938,14 @@
         // Ask server for localized tab + fresh library (same pattern as Dragger).
         const loc = document.getElementById("plib_localize");
         if (loc) setTimeout(() => loc.click(), 400);
+        // Reference Library collections may register after us: refresh names/availability once the page is up.
+        setTimeout(() => { const b = document.getElementById("plib_reflib_refresh"); if (b) b.click(); }, 1500);
+        // Detect writes made through the Python API (e.g. Reference Library's "Prompts" selector): poll the revision.
+        setInterval(() => {
+            if (document.visibilityState !== "visible") return;
+            const b = document.getElementById("plib_poll");
+            if (b) b.click();
+        }, 3000);
         // Re-check mounts as Gradio re-renders the form on model changes.
         setInterval(() => {
             loadTargets();
@@ -814,6 +967,11 @@
         searchLocal,
         fold,
         tabRequest: null,
+        apply: (id, opts) => applyPromptById(id, opts || {}),
+        collections: () => collections,
+        collectionsFor: (id) => linkedCollections(library.find(p => p.id === id)),
+        revision: () => lastRevision,
+        _onRevision: onRevision,
         // test helpers
         _library: () => library,
         _mounts: () => mounts,

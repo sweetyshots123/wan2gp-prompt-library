@@ -16,11 +16,19 @@ Schema:
         "created": 1696...,
         "updated": 1696...,
         "use_count": 0,
-        "last_used": null
+        "last_used": null,
+        "collections": ["<Reference Library collection id>", ...]   # since 1.1.0 (schema 2)
       },
       ...
     ]
   }
+
+Schema 1 files (Prompt Library 1.0.x, no "collections") are read transparently (collections = []) and
+written back as schema 2 on the next change.
+
+Links to Reference Library collections live ONLY here (Prompt Library is the single source of truth).
+Collection ids that Reference Library does not know (deleted / in its 15-minute trash) are kept and simply
+ignored by the UI: they are never pruned automatically, so restoring a collection restores its links.
 """
 from __future__ import annotations
 
@@ -36,7 +44,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 LIBRARY_PATH = os.path.join(PLUGIN_DIR, "library.json")
-LIBRARY_VERSION = 1
+LIBRARY_VERSION = 2
+
+_COLL_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_MAX_COLLECTIONS = 200
+# In-process change counter: bumped on every write so the page (and other plugins) can detect changes.
+_revision = 0
+_last_change: Dict[str, Any] = {"reason": "load", "id": None, "time": 0.0}
 
 _ID_RE = re.compile(r"^[0-9a-f]{8,64}$")
 _BAD_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]+')
@@ -127,6 +141,44 @@ def _now() -> float:
     return time.time()
 
 
+def check_collection_id(cid: Any) -> str:
+    text = str(cid or "").strip()
+    if not _COLL_ID_RE.match(text):
+        raise StorageError("invalid collection id")
+    return text
+
+
+def _normalize_collections(values) -> List[str]:
+    if values is None:
+        return []
+    if isinstance(values, str):
+        values = [v for v in re.split(r"[,\s]+", values) if v]
+    if not isinstance(values, (list, tuple, set)):
+        return []
+    out, seen = [], set()
+    for value in values:
+        text = str(value or "").strip()
+        if not _COLL_ID_RE.match(text) or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+    return out[:_MAX_COLLECTIONS]
+
+
+def _bump(reason: str, pid: Optional[str] = None) -> None:
+    global _revision
+    _revision += 1
+    _last_change.update({"reason": reason, "id": pid, "time": _now()})
+
+
+def revision() -> int:
+    return _revision
+
+
+def last_change() -> Dict[str, Any]:
+    return dict(_last_change, revision=_revision)
+
+
 def _atomic_write_json(path: str, data: Any) -> None:
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)
@@ -193,6 +245,7 @@ def _coerce_prompt(raw: Any) -> Optional[Dict[str, Any]]:
         "updated": updated,
         "use_count": use_count,
         "last_used": last_used,
+        "collections": _normalize_collections(raw.get("collections")),
     }
 
 
@@ -210,6 +263,7 @@ def _seed_examples() -> List[Dict[str, Any]]:
             "updated": now + i * 0.001,
             "use_count": 0,
             "last_used": None,
+            "collections": [],
         })
     return out
 
@@ -224,6 +278,7 @@ def load_library(path: Optional[str] = None) -> Dict[str, Any]:
             lib = _empty_library()
             lib["prompts"] = _seed_examples()
             _atomic_write_json(path, lib)
+            _bump("seed")
             return lib
         except Exception as e:
             print(f"[Prompt Library] Ignoring invalid library.json: {e}")
@@ -241,7 +296,7 @@ def load_library(path: Optional[str] = None) -> Dict[str, Any]:
         return {"version": LIBRARY_VERSION, "prompts": prompts}
 
 
-def save_library(lib: Dict[str, Any], path: Optional[str] = None) -> None:
+def save_library(lib: Dict[str, Any], path: Optional[str] = None, reason: str = "update", pid: Optional[str] = None) -> None:
     path = path or LIBRARY_PATH
     payload = {
         "version": LIBRARY_VERSION,
@@ -249,6 +304,7 @@ def save_library(lib: Dict[str, Any], path: Optional[str] = None) -> None:
     }
     with _lock:
         _atomic_write_json(path, payload)
+        _bump(reason, pid)
 
 
 def list_prompts(path: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -269,6 +325,7 @@ def create_prompt(
     tags=None,
     category: str = "",
     path: Optional[str] = None,
+    collections=None,
 ) -> Dict[str, Any]:
     title = _safe_title(title, fallback="")
     text = str(text or "")
@@ -287,11 +344,12 @@ def create_prompt(
         "updated": now,
         "use_count": 0,
         "last_used": None,
+        "collections": _normalize_collections(collections),
     }
     with _lock:
         lib = load_library(path)
         lib["prompts"].append(item)
-        save_library(lib, path)
+        save_library(lib, path, "create", item["id"])
     return item
 
 
@@ -302,6 +360,7 @@ def update_prompt(
     text: Optional[str] = None,
     tags=None,
     category: Optional[str] = None,
+    collections=None,
     path: Optional[str] = None,
 ) -> Dict[str, Any]:
     pid = _check_id(prompt_id)
@@ -318,9 +377,11 @@ def update_prompt(
                 item["tags"] = _normalize_tags(tags)
             if category is not None:
                 item["category"] = _normalize_category(category)
+            if collections is not None:
+                item["collections"] = _normalize_collections(collections)
             item["updated"] = _now()
             lib["prompts"][i] = item
-            save_library(lib, path)
+            save_library(lib, path, "update", pid)
             return item
     raise StorageError("prompt not found")
 
@@ -333,6 +394,7 @@ def duplicate_prompt(prompt_id: str, path: Optional[str] = None) -> Dict[str, An
         tags=list(src.get("tags") or []),
         category=src.get("category") or "",
         path=path,
+        collections=list(src.get("collections") or []),
     )
 
 
@@ -343,7 +405,7 @@ def delete_prompt(prompt_id: str, path: Optional[str] = None) -> Dict[str, Any]:
         for i, item in enumerate(lib["prompts"]):
             if item["id"] == pid:
                 removed = lib["prompts"].pop(i)
-                save_library(lib, path)
+                save_library(lib, path, "delete", pid)
                 return removed
     raise StorageError("prompt not found")
 
@@ -359,7 +421,7 @@ def mark_used(prompt_id: str, path: Optional[str] = None) -> Dict[str, Any]:
             item["last_used"] = _now()
             item["updated"] = item["updated"]  # keep content timestamp
             lib["prompts"][i] = item
-            save_library(lib, path)
+            save_library(lib, path, "used", pid)
             return item
     raise StorageError("prompt not found")
 
@@ -416,7 +478,7 @@ def import_json(raw: str, path: Optional[str] = None, replace: bool = False) -> 
             existing_keys.add((_fold(item["title"]), _fold(item["text"])))
             lib["prompts"].append(item)
             added += 1
-        save_library(lib, path)
+        save_library(lib, path, "import")
     return added, skipped
 
 
@@ -457,6 +519,51 @@ def import_plain_text(raw: str, path: Optional[str] = None) -> Tuple[int, int]:
     return added, skipped
 
 
+# ---------------------------------------------------------------- collection links (Reference Library)
+def collections_for_prompt(prompt_id: str, path: Optional[str] = None) -> List[str]:
+    return list(get_prompt(prompt_id, path).get("collections") or [])
+
+
+def set_prompt_collections(prompt_id: str, collection_ids, path: Optional[str] = None) -> Dict[str, Any]:
+    return update_prompt(prompt_id, collections=_normalize_collections(collection_ids), path=path)
+
+
+def prompts_for_collection(collection_id: str, path: Optional[str] = None) -> List[str]:
+    cid = check_collection_id(collection_id)
+    return [p["id"] for p in list_prompts(path) if cid in (p.get("collections") or [])]
+
+
+def set_collection_prompts(collection_id: str, prompt_ids, path: Optional[str] = None) -> List[str]:
+    """Make exactly `prompt_ids` linked to `collection_id` (adds/removes this one link only; other links untouched).
+    Unknown / invalid prompt ids are ignored. Returns the resulting linked prompt ids (library order)."""
+    cid = check_collection_id(collection_id)
+    if isinstance(prompt_ids, str):
+        prompt_ids = [prompt_ids]
+    wanted = set()
+    for value in prompt_ids or []:
+        try:
+            wanted.add(_check_id(value))
+        except StorageError:
+            continue
+    with _lock:
+        lib = load_library(path)
+        changed = False
+        for item in lib["prompts"]:
+            links = list(item.get("collections") or [])
+            has = cid in links
+            if item["id"] in wanted and not has:
+                links.append(cid)
+            elif item["id"] not in wanted and has:
+                links = [c for c in links if c != cid]
+            else:
+                continue
+            item["collections"] = _normalize_collections(links)
+            changed = True
+        if changed:
+            save_library(lib, path, "links", None)
+        return [p["id"] for p in lib["prompts"] if cid in (p.get("collections") or [])]
+
+
 def find_variables(text: str) -> List[str]:
     seen, out = set(), []
     for match in _VAR_RE.finditer(str(text or "")):
@@ -489,22 +596,27 @@ def search_prompts(
     prompts: Optional[List[Dict[str, Any]]] = None,
     path: Optional[str] = None,
     limit: int = 50,
+    collection_names: Optional[Dict[str, str]] = None,
 ) -> List[Dict[str, Any]]:
-    """AND multi-word search. Ranks title > tags > body, then recent/frequent use."""
+    """AND multi-word search. Ranks title > tags > linked collection names > body, then recent/frequent use.
+    `collection_names` maps known Reference Library collection ids to names (unknown ids are ignored)."""
     items = prompts if prompts is not None else list_prompts(path)
     words = [w for w in _WORD_SPLIT.split(_fold(query)) if w]
+    names = collection_names or {}
     scored: List[Tuple[Tuple, Dict[str, Any]]] = []
     for item in items:
         title, tags, body = _haystacks(item)
-        all_text = f"{title} {tags} {body}"
+        colls = _fold(" ".join(names[c] for c in (item.get("collections") or []) if c in names))
+        all_text = f"{title} {tags} {colls} {body}"
         if words and not all(w in all_text for w in words):
             continue
         title_hits = sum(1 for w in words if w in title) if words else 0
         tag_hits = sum(1 for w in words if w in tags) if words else 0
+        coll_hits = sum(1 for w in words if w in colls) if words else 0
         body_hits = sum(1 for w in words if w in body) if words else 0
         # empty query: browse by recent/frequent
         rank = (
-            -title_hits * 100 - tag_hits * 40 - body_hits * 10,
+            -title_hits * 100 - tag_hits * 40 - coll_hits * 30 - body_hits * 10,
             -(item.get("last_used") or 0),
             -(item.get("use_count") or 0),
             -(item.get("updated") or 0),
@@ -555,5 +667,6 @@ def client_payload(path: Optional[str] = None) -> List[Dict[str, Any]]:
             "last_used": item.get("last_used"),
             "updated": item.get("updated"),
             "vars": find_variables(item.get("text") or ""),
+            "collections": list(item.get("collections") or []),
         })
     return out

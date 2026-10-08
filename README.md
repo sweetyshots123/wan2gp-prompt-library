@@ -1,12 +1,13 @@
 # Prompt Library — reusable text prompts for Wan2GP
 
-*[Español](README.es.md)* · MIT License · v1.0.0
+*[Español](README.es.md)* · MIT License · v1.1.0
 
 **Prompt Library** is a plugin for [Wan2GP / WanGP](https://github.com/deepbeepmeep/Wan2GP) that turns your best prompts into a searchable library of templates.
 
 - Type a word (or several) next to WanGP's prompt box → matching prompts appear in a dropdown.
 - Pick one → it is inserted into WanGP's own prompt field (replace, append, or at the cursor).
 - Manage everything from the **Prompt Library** tab: create, edit, duplicate, delete, import and export.
+- Optional: link prompts to [Reference Library](https://github.com/sweetyshots123/wan2gp-reference-library) image collections, in both directions.
 
 It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survives WanGP updates. It coexists with [Dragger](https://github.com/sweetyshots123/wan2gp-dragger), [Vidosser](https://github.com/sweetyshots123/wan2gp-vidosser) and Reference Library.
 
@@ -34,11 +35,54 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 **Manager (Prompt Library tab, or the Manage button)**
 - Library and editor on the left, settings on the right.
 - List + filter, create, edit, duplicate, delete (type `DELETE` to confirm).
-- Tags and optional category/collection.
+- Tags and an optional category.
 - Import / export as JSON (full library) or plain text (blocks separated by `---`).
 
 **Starter examples**
 - The first run creates three prompts titled `[Example] …`. Delete them whenever you like; they are only seeds.
+
+## Reference Library collections (1.1.0)
+
+If [Reference Library](https://github.com/sweetyshots123/wan2gp-reference-library) **1.1 or newer** is installed, prompts and image collections can be linked to each other:
+
+- **Manager:** a **Collections** multi-select under the tags lists the Reference Library collections. Select the ones that go with the prompt and press *Save prompt*. Reference Library shows the same link from its side (its *Prompts* selector), because both plugins read the same data.
+- **Autocomplete:** linked collections appear as small accent chips with an image icon, separate from the tags. Typing a collection name also finds its prompts (e.g. `retratos`).
+- **Picking a prompt that has collections** (setting *When I pick a prompt that has collections*):
+  - *Offer to load its collection* (default): the insert message gets a **Load collection X** button. Nothing changes until you click it.
+  - *Load the first collection automatically*.
+  - *Do nothing*.
+- **Loading a collection in Reference Library:** Reference Library itself offers the linked prompts, so by default Prompt Library stays quiet. The setting *When a collection is loaded in Reference Library → Also offer its linked prompts here* adds a toast with *Use «title»* buttons. The prompt is never overwritten without a click.
+- **Without Reference Library** (or with an older or incompatible version), every collection control is hidden and everything else works as before.
+
+**Deleted collections.** A link to a collection that Reference Library no longer lists (deleted, or in its 15-minute trash) is simply ignored: it is not shown and not searchable. It is never pruned automatically. If you undo the deletion, the links come back. Saving a prompt in the manager also keeps those hidden links.
+
+### For plugin developers
+
+Links live only in Prompt Library's `library.json` (`collections: [collection id, …]` per prompt; schema 2). Old 1.0.x files are migrated transparently.
+
+**Python:** `sys.modules["wan2gp_prompt_library_api"]`, `API_VERSION = 1`. All writes are thread-safe and saved atomically.
+
+| Function | Returns / does |
+|---|---|
+| `list_prompts()` | `[{id, title, preview, tags, collections}]` |
+| `prompts_for_collection(cid)` | `[prompt ids]` |
+| `set_collection_prompts(cid, prompt_ids)` | makes exactly those prompts linked to `cid`; other links untouched; unknown ids ignored; returns the result |
+| `collections_for_prompt(pid)` | `[collection ids]` |
+| `set_prompt_collections(pid, cids)` | replaces one prompt's links |
+| `get_prompt(pid)` | `{id, title, text, tags, collections}` or `None` |
+| `revision()` | change counter |
+
+Invalid ids raise `ValueError`. Look the module up at call time, because plugin load order is not guaranteed.
+
+**JS events (on `window`):**
+
+- Listens for `promptlib:apply` `{detail: {id, mode?}}` and inserts that prompt (template variables are asked first).
+- Emits `promptlib:applied` `{id, title}` after a successful insert.
+- Emits `promptlib:changed` `{revision, reason, id}` after any change to the library. This includes changes made through the Python API: the page polls the revision every 3 s while visible.
+- Dispatches `reflib:apply` `{id}` to load a collection.
+- Listens for `reflib:changed` (refreshes names) and `reflib:applied`.
+
+Prompt Library consumes `sys.modules["wan2gp_reference_library_api"]` (`API_VERSION` 1, `list_collections()`) and never reads Reference Library's files.
 
 ## How it works
 
@@ -57,6 +101,8 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 | How to insert | *Replace* / *Append* / *Insert at cursor* | Replace |
 | Offer “Undo” after inserting | undo toast | on |
 | Confirmation messages + Duration | toasts (errors always show) | on, 3.5 s |
+| When I pick a prompt that has collections | *Do nothing* / *Offer to load its collection* / *Load the first collection automatically* (only with Reference Library 1.1+) | Offer |
+| When a collection is loaded in Reference Library | *Do nothing here* / *Also offer its linked prompts here* (only with Reference Library 1.1+) | Do nothing |
 
 ## Install
 
@@ -68,7 +114,7 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 
 Inside the plugin folder (next to `plugin.py`):
 
-- `library.json` — your prompts (created on first use, with 3 example entries).
+- `library.json` — your prompts and their links to Reference Library collections (created on first use, with 3 example entries).
 - `settings.json` — your settings (created when you save).
 
 Both are excluded from the zip and from git.

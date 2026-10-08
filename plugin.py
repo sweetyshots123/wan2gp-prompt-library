@@ -11,6 +11,10 @@ How it works
   * Prompts live in ``library.json`` inside the plugin folder (atomic writes, gitignored).
   * Settings live in ``settings.json`` (same pattern as Dragger).
   * Bilingual EN/ES: TEXT table below + I18N in the JS. Setting ``language``: auto / en / es.
+  * Reference Library link (1.1.0): each prompt has ``collections: [cid, ...]`` (this plugin is the single source of
+    truth). Python API for other plugins: ``sys.modules["wan2gp_prompt_library_api"]`` (API_VERSION 1). Reference
+    Library is consumed lazily through ``sys.modules["wan2gp_reference_library_api"]``; when it is missing (or a
+    different API_VERSION) every collection control is hidden and the plugin works as before.
 """
 from __future__ import annotations
 
@@ -18,6 +22,7 @@ import copy
 import json
 import math
 import os
+import sys
 import threading
 import time
 import traceback
@@ -28,7 +33,7 @@ from shared.utils.plugins import WAN2GPPlugin
 
 from . import storage
 
-PLUGIN_VERSION = "1.0.1"
+PLUGIN_VERSION = "1.1.0"
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(_PLUGIN_DIR, "settings.json")
 
@@ -40,6 +45,7 @@ TEXT = {
     "en": {
         "intro": "Save reusable **prompt templates**, find them with autocomplete next to WanGP's prompt box "
                  "(type one or more words; accent-insensitive), and insert them with replace or append. "
+                 "With Reference Library 1.1+ installed, a prompt can be linked to its image **collections** (and vice versa). "
                  "Manage the library on the left, settings on the right. Data is stored in `library.json` in the plugin folder and survives updates.",
         "language": "Language / Idioma",
         "language_info": "Auto = the browser language (Spanish if it is Spanish, English otherwise). Applies immediately.",
@@ -67,7 +73,7 @@ TEXT = {
         "mgr_title": "Title",
         "mgr_text": "Prompt text",
         "mgr_tags": "Tags (comma-separated)",
-        "mgr_category": "Category / collection",
+        "mgr_category": "Category",
         "mgr_list": "Prompts",
         "mgr_new": "New",
         "mgr_save": "Save prompt",
@@ -100,10 +106,21 @@ TEXT = {
         "bar_save": "Save current",
         "bar_manage": "Manage",
         "undone": "Previous prompt restored",
+        "mgr_collections": "Collections",
+        "mgr_collections_info": "Reference Library collections linked to this prompt. The link works both ways: the collection also lists this prompt.",
+        "sec_reflib": "### Reference Library",
+        "on_pick_collection": "When I pick a prompt that has collections",
+        "pick_none": "Do nothing",
+        "pick_offer": "Offer to load its collection",
+        "pick_auto": "Load the first collection automatically",
+        "on_reflib_applied": "When a collection is loaded in Reference Library",
+        "applied_none": "Do nothing here (Reference Library already offers its prompts)",
+        "applied_offer": "Also offer its linked prompts here",
     },
     "es": {
         "intro": "Guarda **plantillas de prompt** reutilizables, encuéntralas con autocompletado junto al cuadro de prompt de WanGP "
                  "(escribe una o varias palabras; sin distinguir acentos) e insértalas reemplazando o añadiendo. "
+                 "Con Reference Library 1.1+ instalado, puedes asociar un prompt a sus **colecciones** de imágenes (y al revés). "
                  "Gestiona la librería a la izquierda y los ajustes a la derecha. Los datos están en `library.json` de la carpeta del plugin y sobreviven a las actualizaciones.",
         "language": "Language / Idioma",
         "language_info": "Auto = el idioma del navegador (español si está en español; si no, inglés). Se aplica al momento.",
@@ -131,7 +148,7 @@ TEXT = {
         "mgr_title": "Título",
         "mgr_text": "Texto del prompt",
         "mgr_tags": "Etiquetas (separadas por comas)",
-        "mgr_category": "Categoría / colección",
+        "mgr_category": "Categoría",
         "mgr_list": "Prompts",
         "mgr_new": "Nuevo",
         "mgr_save": "Guardar prompt",
@@ -164,6 +181,16 @@ TEXT = {
         "bar_save": "Guardar actual",
         "bar_manage": "Gestionar",
         "undone": "Prompt anterior restaurado",
+        "mgr_collections": "Colecciones",
+        "mgr_collections_info": "Colecciones de Reference Library asociadas a este prompt. El vínculo va en los dos sentidos: la colección también muestra este prompt.",
+        "sec_reflib": "### Reference Library",
+        "on_pick_collection": "Al elegir un prompt con colecciones",
+        "pick_none": "No hacer nada",
+        "pick_offer": "Ofrecer cargar su colección",
+        "pick_auto": "Cargar la primera colección automáticamente",
+        "on_reflib_applied": "Al cargar una colección en Reference Library",
+        "applied_none": "No hacer nada aquí (Reference Library ya ofrece sus prompts)",
+        "applied_offer": "Ofrecer también aquí sus prompts asociados",
     },
 }
 
@@ -189,6 +216,158 @@ def insert_mode_choices(lang):
     return [(tr(lang, "mode_" + v), v) for v in ("replace", "append", "cursor")]
 
 
+def pick_collection_choices(lang):
+    return [(tr(lang, "pick_" + v), v) for v in ("none", "offer", "auto")]
+
+
+def reflib_applied_choices(lang):
+    return [(tr(lang, "applied_" + v), v) for v in ("none", "offer")]
+
+
+# ---------------------------------------------------------------- Reference Library (consumed lazily)
+REFLIB_API_MODULE = "wan2gp_reference_library_api"
+REFLIB_API_VERSION = 1
+_reflib_warned = set()
+
+
+def reflib_api():
+    """The Reference Library API module if present and compatible, else None. Looked up at call time because the
+    plugin load order is not guaranteed."""
+    mod = sys.modules.get(REFLIB_API_MODULE)
+    if mod is None:
+        return None
+    if getattr(mod, "API_VERSION", None) != REFLIB_API_VERSION or not callable(getattr(mod, "list_collections", None)):
+        key = ("version", getattr(mod, "API_VERSION", None))
+        if key not in _reflib_warned:
+            _reflib_warned.add(key)
+            print(f"[Prompt Library] Reference Library API version {key[1]!r} not supported (need {REFLIB_API_VERSION}); collection links hidden")
+        return None
+    return mod
+
+
+def reflib_collections():
+    """[{id, name, count}] from Reference Library, or None when it is not available (UI hidden)."""
+    api = reflib_api()
+    if api is None:
+        return None
+    try:
+        raw = api.list_collections() or []
+    except Exception as e:
+        if "error" not in _reflib_warned:
+            _reflib_warned.add("error")
+            print(f"[Prompt Library] Reference Library list_collections() failed: {e}")
+        return None
+    out, seen = [], set()
+    for col in raw:
+        if not isinstance(col, dict):
+            continue
+        cid = str(col.get("id") or "").strip()
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        try:
+            count = int(col.get("count") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        out.append({"id": cid, "name": str(col.get("name") or cid[:8]), "count": count})
+    return out
+
+
+def reflib_names(cols=None):
+    cols = reflib_collections() if cols is None else cols
+    return {c["id"]: c["name"] for c in (cols or [])}
+
+
+def collection_choices(cols):
+    return [(c["name"], c["id"]) for c in (cols or [])]
+
+
+def merge_links(selected, previous, known_ids):
+    """Links to save from the manager: what is selected among KNOWN collections, plus previous links to ids Reference
+    Library does not list right now (deleted/in trash/unavailable), which are kept so an undo restores them."""
+    known = set(known_ids)
+    out = [c for c in (selected or []) if c in known]
+    out += [c for c in (previous or []) if c not in known and c not in out]
+    return out
+
+
+# ---------------------------------------------------------------- public Python API for other plugins
+API_MODULE_NAME = "wan2gp_prompt_library_api"
+API_VERSION = 1
+
+
+def _preview(text, n=120):
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= n else text[: n - 1] + "…"
+
+
+def _api_list_prompts():
+    """[{id, title, preview, tags, collections}] in library order."""
+    return [
+        {"id": p["id"], "title": p["title"], "preview": _preview(p.get("text")),
+         "tags": list(p.get("tags") or []), "collections": list(p.get("collections") or [])}
+        for p in storage.list_prompts()
+    ]
+
+
+def _api_get_prompt(prompt_id):
+    try:
+        p = storage.get_prompt(prompt_id)
+    except storage.StorageError:
+        return None
+    return {"id": p["id"], "title": p["title"], "text": p.get("text") or "", "tags": list(p.get("tags") or []),
+            "collections": list(p.get("collections") or [])}
+
+
+def _api_prompts_for_collection(cid):
+    try:
+        return storage.prompts_for_collection(cid)
+    except storage.StorageError as e:
+        raise ValueError(str(e)) from e
+
+
+def _api_set_collection_prompts(cid, prompt_ids):
+    try:
+        return storage.set_collection_prompts(cid, prompt_ids)
+    except storage.StorageError as e:
+        raise ValueError(str(e)) from e
+
+
+def _api_collections_for_prompt(prompt_id):
+    try:
+        return storage.collections_for_prompt(prompt_id)
+    except storage.StorageError:
+        return []
+
+
+def _api_set_prompt_collections(prompt_id, collection_ids):
+    try:
+        return list(storage.set_prompt_collections(prompt_id, collection_ids).get("collections") or [])
+    except storage.StorageError as e:
+        raise ValueError(str(e)) from e
+
+
+def register_api():
+    """Expose sys.modules["wan2gp_prompt_library_api"]. Every write is thread-safe (storage lock), saved atomically
+    and bumps storage.revision(); the open page polls it and emits the JS event `promptlib:changed`."""
+    import types
+    mod = sys.modules.get(API_MODULE_NAME)
+    if mod is None or getattr(mod, "__plib_owner__", None) != __name__:
+        mod = types.ModuleType(API_MODULE_NAME, "Prompt Library public API (see README)")
+        mod.__plib_owner__ = __name__
+    mod.API_VERSION = API_VERSION
+    mod.VERSION = PLUGIN_VERSION
+    mod.list_prompts = _api_list_prompts
+    mod.get_prompt = _api_get_prompt
+    mod.prompts_for_collection = _api_prompts_for_collection
+    mod.set_collection_prompts = _api_set_collection_prompts
+    mod.collections_for_prompt = _api_collections_for_prompt
+    mod.set_prompt_collections = _api_set_prompt_collections
+    mod.revision = storage.revision
+    sys.modules[API_MODULE_NAME] = mod
+    return mod
+
+
 DEFAULT_SETTINGS = {
     "enabled": True,
     "show_edit": True,
@@ -198,8 +377,15 @@ DEFAULT_SETTINGS = {
     "toast_ms": 3500,
     "undo": True,
     "save_current_button": True,
+    "on_pick_collection": "offer",   # none | offer | auto   (prompt picked -> its Reference Library collection)
+    "on_reflib_applied": "none",     # none | offer          (collection loaded -> its prompts; RL already offers)
 }
-_CHOICES = {"insert_mode": ("replace", "append", "cursor"), "language": ("auto",) + LANGS}
+_CHOICES = {
+    "insert_mode": ("replace", "append", "cursor"),
+    "language": ("auto",) + LANGS,
+    "on_pick_collection": ("none", "offer", "auto"),
+    "on_reflib_applied": ("none", "offer"),
+}
 _RANGES = {"toast_ms": (1000, 30000)}
 
 
@@ -255,12 +441,20 @@ def build_js(settings=None):
     )
 
 
+def _client_meta(cols=None):
+    """Extra state sent with the library: revision counter, last change, Reference Library collections (None = hidden)."""
+    cols = reflib_collections() if cols is None else cols
+    return {"revision": storage.revision(), "change": storage.last_change(), "collections": cols}
+
+
 def _library_json_for_client():
-    return json.dumps({"version": storage.LIBRARY_VERSION, "prompts": storage.client_payload()}, ensure_ascii=False)
+    data = {"version": storage.LIBRARY_VERSION, "prompts": storage.client_payload()}
+    data.update(_client_meta())
+    return json.dumps(data, ensure_ascii=False)
 
 
 def _list_choices(query: str = ""):
-    items = storage.search_prompts(query or "", limit=500)
+    items = storage.search_prompts(query or "", limit=500, collection_names=reflib_names())
     choices = []
     for item in items:
         tags = ", ".join(item.get("tags") or [])
@@ -289,6 +483,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         self.request_component("wizard_prompt")
         self.request_component("tab_id")
         self.request_component("prompt_column_wizard")  # anchor: the search bar goes right after the prompt box
+        register_api()
         self.add_custom_js(build_js())
         self.add_tab(tab_id="prompt_library", label="Prompt Library", component_constructor=self.create_ui)
 
@@ -345,6 +540,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         "sec_manager", "mgr_search", "mgr_list", "mgr_title", "mgr_text", "mgr_tags",
         "mgr_category", "mgr_new", "mgr_save", "mgr_dup", "mgr_del", "mgr_refresh",
         "mgr_import", "mgr_export_json", "mgr_export_txt", "mgr_confirm_del", "mgr_io",
+        "mgr_collections", "sec_reflib", "on_pick_collection", "on_reflib_applied",
     )
 
     @staticmethod
@@ -381,6 +577,10 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             "mgr_export_txt": {"value": t("mgr_export_txt")},
             "mgr_confirm_del": {"label": t("mgr_confirm_del")},
             "mgr_io": {"label": t("mgr_io")},
+            "mgr_collections": {"label": t("mgr_collections"), "info": t("mgr_collections_info")},
+            "sec_reflib": {"value": t("sec_reflib")},
+            "on_pick_collection": {"label": t("on_pick_collection"), "choices": pick_collection_choices(lang)},
+            "on_reflib_applied": {"label": t("on_reflib_applied"), "choices": reflib_applied_choices(lang)},
         }
 
     def tab_updates(self, lang):
@@ -392,6 +592,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         current = lambda key: (lambda: load_settings()[key])
         lang = resolve_lang(load_settings()["language"])
         tx = self.tab_texts(lang)
+        cols = reflib_collections()  # None -> Reference Library missing: collection UI hidden (re-checked at page load)
         ui = {}
         gr.HTML("<style>.plib-hidden{display:none !important;}</style>")
         ui["intro"] = gr.Markdown(tx["intro"]["value"], elem_id="plib_intro")
@@ -413,6 +614,10 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                         ui["mgr_title"] = gr.Textbox(scale=3, elem_id="plib_mgr_title", **tx["mgr_title"])
                         ui["mgr_category"] = gr.Textbox(scale=2, elem_id="plib_mgr_category", **tx["mgr_category"])
                     ui["mgr_tags"] = gr.Textbox(elem_id="plib_mgr_tags", **tx["mgr_tags"])
+                    ui["mgr_collections"] = gr.Dropdown(
+                        choices=collection_choices(cols), value=[], multiselect=True, allow_custom_value=False,
+                        interactive=True, visible=cols is not None, elem_id="plib_mgr_collections", **tx["mgr_collections"],
+                    )
                     ui["mgr_text"] = gr.Textbox(lines=6, elem_id="plib_mgr_text", **tx["mgr_text"])
                 with gr.Row(elem_classes=["plib-mgr-actions"]):
                     ui["mgr_new"] = gr.Button(tx["mgr_new"]["value"], size="sm", variant="secondary", elem_id="plib_mgr_new")
@@ -447,6 +652,12 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                         value=lambda: load_settings()["toast_ms"] / 1000,
                         minimum=1, maximum=30, step=0.5, elem_id="plib_toast_s", **tx["toast_s"],
                     )
+                with gr.Group(visible=cols is not None, elem_id="plib_reflib_settings") as reflib_group:
+                    ui["sec_reflib"] = gr.Markdown(tx["sec_reflib"]["value"], elem_classes=["plib-sec"])
+                    ui["on_pick_collection"] = gr.Dropdown(value=current("on_pick_collection"), elem_id="plib_on_pick_collection",
+                                                           **tx["on_pick_collection"])
+                    ui["on_reflib_applied"] = gr.Dropdown(value=current("on_reflib_applied"), elem_id="plib_on_reflib_applied",
+                                                          **tx["on_reflib_applied"])
                 ui["save"] = gr.Button(tx["save"]["value"], variant="primary", elem_id="plib_save_settings")
                 status = gr.Markdown("", elem_id="plib_status")
 
@@ -462,6 +673,9 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             selected_id = gr.Textbox(value="", elem_id="plib_mgr_selected", show_label=False)
             localize_btn = gr.Button("localize", elem_id="plib_localize")
             sync_btn = gr.Button("sync", elem_id="plib_sync")
+            reflib_btn = gr.Button("reflib", elem_id="plib_reflib_refresh")
+            rev_box = gr.Textbox(value="", elem_id="plib_rev", show_label=False)
+            poll_btn = gr.Button("poll", elem_id="plib_poll")
             # One bridge button per registered prompt field. Inputs include both prompt fields of that tab
             # so we can update the right one (or both) without touching core WanGP files.
             by_tab = {}
@@ -521,9 +735,34 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }",
         )
 
+        # Reference Library collections (names / availability) -> manager selector, settings group and the page cache.
+        def refresh_reflib(current_value):
+            cols2 = reflib_collections()
+            lib = _library_json_for_client()
+            if cols2 is None:
+                return gr.update(visible=False, choices=[], value=[]), gr.update(visible=False), lib
+            known = {c["id"] for c in cols2}
+            value = [c for c in (current_value or []) if c in known]
+            return gr.update(visible=True, choices=collection_choices(cols2), value=value), gr.update(visible=True), lib
+
+        reflib_btn.click(
+            fn=refresh_reflib, inputs=[ui["mgr_collections"]], outputs=[ui["mgr_collections"], reflib_group, library_json],
+            show_progress="hidden", queue=False,
+        ).then(
+            fn=None, inputs=[library_json], outputs=None,
+            js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }",
+        )
+        # Cheap change detection (Python API writes from other plugins): the page polls the revision counter.
+        poll_btn.click(
+            fn=lambda: str(storage.revision()), inputs=None, outputs=[rev_box], show_progress="hidden", queue=False,
+        ).then(
+            fn=None, inputs=[rev_box], outputs=None,
+            js="(r) => { if (window.promptLibrary) window.promptLibrary._onRevision(r); }",
+        )
+
         settings_inputs = [
             ui["enabled"], ui["show_edit"], ui["save_btn_near"], ui["insert_mode"], ui["undo"],
-            ui["toasts"], ui["toast_s"], ui["language"], browser_lang,
+            ui["toasts"], ui["toast_s"], ui["on_pick_collection"], ui["on_reflib_applied"], ui["language"], browser_lang,
         ]
         ui["save"].click(
             fn=self._save_from_ui, inputs=settings_inputs,
@@ -540,36 +779,59 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             value = selected if selected and any(c[1] == selected for c in choices) else (choices[0][1] if choices else None)
             return gr.update(choices=choices, value=value)
 
+        def colls_update(item):
+            """Selector value for a prompt: its links to collections Reference Library currently lists."""
+            cols2 = reflib_collections()
+            if cols2 is None:
+                return gr.update(value=[])
+            known = {c["id"] for c in cols2}
+            links = [c for c in ((item or {}).get("collections") or []) if c in known]
+            return gr.update(choices=collection_choices(cols2), value=links)
+
         def on_select(pid):
             if not pid:
-                return "", "", "", "", ""
+                return "", "", "", "", "", gr.update(value=[])
             try:
                 item = storage.get_prompt(pid)
             except storage.StorageError:
-                return "", "", "", "", ""
+                return "", "", "", "", "", gr.update(value=[])
             return (
                 item["id"],
                 item["title"],
                 item["text"],
                 ", ".join(item.get("tags") or []),
                 item.get("category") or "",
+                colls_update(item),
             )
 
         def do_new():
-            return "", "", "", "", "", tr(resolve_lang(load_settings()["language"]), "mgr_new")
+            return "", "", "", "", "", gr.update(value=[]), tr(resolve_lang(load_settings()["language"]), "mgr_new")
 
-        def do_save(pid, title, text, tags, category, browser=""):
+        def links_to_save(pid, selected):
+            cols2 = reflib_collections()
+            if cols2 is None:
+                return None  # Reference Library unavailable: never touch existing links
+            previous = []
+            if pid:
+                try:
+                    previous = storage.get_prompt(pid).get("collections") or []
+                except storage.StorageError:
+                    previous = []
+            return merge_links(selected or [], previous, [c["id"] for c in cols2])
+
+        def do_save(pid, title, text, tags, category, colls=None, browser=""):
             lang2 = resolve_lang(load_settings()["language"], browser)
             title = (title or "").strip()
             text = text or ""
             if not title and not text.strip():
                 return tr(lang2, "need_title_or_text"), gr.update(), pid, _library_json_for_client()
             try:
+                links = links_to_save(pid, colls)
                 if pid:
-                    item = storage.update_prompt(pid, title=title or None, text=text, tags=tags, category=category)
+                    item = storage.update_prompt(pid, title=title or None, text=text, tags=tags, category=category, collections=links)
                     msg = tr(lang2, "updated", title=item["title"])
                 else:
-                    item = storage.create_prompt(title, text, tags=tags, category=category)
+                    item = storage.create_prompt(title, text, tags=tags, category=category, collections=links)
                     msg = tr(lang2, "created", title=item["title"])
                 return msg, refresh_list("", item["id"]), item["id"], _library_json_for_client()
             except storage.StorageError as e:
@@ -578,31 +840,33 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         def do_dup(pid, browser=""):
             lang2 = resolve_lang(load_settings()["language"], browser)
             if not pid:
-                return tr(lang2, "need_select"), gr.update(), pid, "", "", "", "", _library_json_for_client()
+                return tr(lang2, "need_select"), gr.update(), pid, "", "", "", "", gr.update(), _library_json_for_client()
             try:
                 item = storage.duplicate_prompt(pid)
             except storage.StorageError:
-                return tr(lang2, "not_found"), gr.update(), "", "", "", "", "", _library_json_for_client()
+                return tr(lang2, "not_found"), gr.update(), "", "", "", "", "", gr.update(value=[]), _library_json_for_client()
             return (
                 tr(lang2, "duplicated", title=item["title"]),
                 refresh_list("", item["id"]),
                 item["id"], item["title"], item["text"],
                 ", ".join(item.get("tags") or []), item.get("category") or "",
+                colls_update(item),
                 _library_json_for_client(),
             )
 
         def do_del(pid, confirm, browser=""):
             lang2 = resolve_lang(load_settings()["language"], browser)
             if not pid:
-                return tr(lang2, "need_select"), gr.update(), pid, "", "", "", "", confirm, _library_json_for_client()
+                return tr(lang2, "need_select"), gr.update(), pid, "", "", "", "", gr.update(), confirm, _library_json_for_client()
             if str(confirm or "").strip().upper() != "DELETE":
-                return tr(lang2, "need_confirm"), gr.update(), pid, gr.update(), gr.update(), gr.update(), gr.update(), confirm, _library_json_for_client()
+                return (tr(lang2, "need_confirm"), gr.update(), pid, gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+                        confirm, _library_json_for_client())
             try:
                 storage.delete_prompt(pid)
             except storage.StorageError:
-                return tr(lang2, "not_found"), gr.update(), "", "", "", "", "", "", _library_json_for_client()
+                return tr(lang2, "not_found"), gr.update(), "", "", "", "", "", gr.update(value=[]), "", _library_json_for_client()
             return (
-                tr(lang2, "deleted"), refresh_list(""), "", "", "", "", "", "", _library_json_for_client(),
+                tr(lang2, "deleted"), refresh_list(""), "", "", "", "", "", gr.update(value=[]), "", _library_json_for_client(),
             )
 
         def do_import(raw, browser=""):
@@ -629,7 +893,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
 
         ui["mgr_list"].change(
             fn=on_select, inputs=[ui["mgr_list"]],
-            outputs=[selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"]],
+            outputs=[selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], ui["mgr_collections"]],
             show_progress="hidden",
         )
         ui["mgr_search"].change(
@@ -642,25 +906,27 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }")
         ui["mgr_new"].click(
             fn=do_new, inputs=None,
-            outputs=[selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], mgr_status],
+            outputs=[selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], ui["mgr_collections"], mgr_status],
             show_progress="hidden",
         )
         ui["mgr_save"].click(
             fn=do_save,
-            inputs=[selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], browser_lang],
+            inputs=[selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], ui["mgr_collections"], browser_lang],
             outputs=[mgr_status, ui["mgr_list"], selected_id, library_json],
             show_progress="hidden",
         ).then(fn=None, inputs=[library_json], outputs=None,
                js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }")
         ui["mgr_dup"].click(
             fn=do_dup, inputs=[selected_id, browser_lang],
-            outputs=[mgr_status, ui["mgr_list"], selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], library_json],
+            outputs=[mgr_status, ui["mgr_list"], selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"],
+                     ui["mgr_collections"], library_json],
             show_progress="hidden",
         ).then(fn=None, inputs=[library_json], outputs=None,
                js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }")
         ui["mgr_del"].click(
             fn=do_del, inputs=[selected_id, ui["mgr_confirm_del"], browser_lang],
-            outputs=[mgr_status, ui["mgr_list"], selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], ui["mgr_confirm_del"], library_json],
+            outputs=[mgr_status, ui["mgr_list"], selected_id, ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"],
+                     ui["mgr_collections"], ui["mgr_confirm_del"], library_json],
             show_progress="hidden",
         ).then(fn=None, inputs=[library_json], outputs=None,
                js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }")
@@ -688,7 +954,8 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         lang = resolve_lang(setting, browser)
         return [json.dumps(load_settings()), _library_json_for_client()] + self.tab_updates(lang)
 
-    def _save_from_ui(self, enabled, show_edit, save_btn_near, insert_mode, undo, toasts, toast_s, language, browser_lang):
+    def _save_from_ui(self, enabled, show_edit, save_btn_near, insert_mode, undo, toasts, toast_s,
+                      on_pick_collection, on_reflib_applied, language, browser_lang):
         settings = load_settings()
         settings["enabled"] = bool(enabled)
         settings["show_edit"] = bool(show_edit)
@@ -700,6 +967,8 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             settings["toast_ms"] = _coerce("toast_ms", DEFAULT_SETTINGS["toast_ms"], float(toast_s) * 1000)
         except Exception:
             settings["toast_ms"] = DEFAULT_SETTINGS["toast_ms"]
+        settings["on_pick_collection"] = _coerce("on_pick_collection", DEFAULT_SETTINGS["on_pick_collection"], on_pick_collection)
+        settings["on_reflib_applied"] = _coerce("on_reflib_applied", DEFAULT_SETTINGS["on_reflib_applied"], on_reflib_applied)
         settings["language"] = _coerce("language", DEFAULT_SETTINGS["language"], language)
         lang = resolve_lang(settings["language"], browser_lang)
         try:
@@ -734,7 +1003,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             if action == "mark_used":
                 pid = req.get("id")
                 storage.mark_used(pid)
-                return self._pack(tab, {"ok": True, "library": storage.client_payload()}, prompt_val, wizard_val, None, None)
+                return self._pack(tab, dict({"ok": True}, **self._lib_resp()), prompt_val, wizard_val, None, None)
             if action == "peek":
                 return self._pack(tab, {"ok": True, "prompt": prompt_val, "wizard_prompt": wizard_val, "id": req.get("req_id")},
                                   prompt_val, wizard_val, None, None)
@@ -746,6 +1015,12 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         except Exception as e:
             traceback.print_exc()
             return self._pack(tab, {"ok": False, "error": str(e)}, prompt_val, wizard_val, None, None)
+
+    @staticmethod
+    def _lib_resp():
+        data = {"library": storage.client_payload()}
+        data.update(_client_meta())
+        return data
 
     def _pack(self, tab, resp, prompt_val, wizard_val, new_prompt, new_wizard):
         resp = dict(resp)
@@ -826,10 +1101,10 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             "mode": mode,
             "field": field,
             "value": new_val,
-            "library": storage.client_payload(),
             "id": req.get("req_id"),
             "tab": tab,
         }
+        resp.update(self._lib_resp())
         # Always write both prompt fields so the visible one (advanced or wizard) updates reliably.
         new_prompt = new_val
         new_wizard = new_val
@@ -864,7 +1139,11 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             "ok": True,
             "toast": tr(lang, "saved_current", title=item["title"]),
             "item": item,
-            "library": storage.client_payload(),
             "id": req.get("req_id"),
         }
+        resp.update(self._lib_resp())
         return self._pack(tab, resp, prompt_val, wizard_val, None, None)
+
+
+# Register the public API as soon as the plugin module is imported (other plugins look it up lazily).
+register_api()

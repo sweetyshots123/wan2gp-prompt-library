@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.0 — 2026-10-08
+
+- **Two-way links with Reference Library collections** (needs Reference Library 1.1+, which has the matching API). Each prompt can have collections, and each collection lists its prompts. Prompt Library is the single source of truth (`collections: [...]` per prompt in `library.json`, schema 2). 1.0.x files are migrated transparently.
+- Manager: **Collections** multi-select per prompt. Its names come from Reference Library and refresh when Reference Library reports a change.
+- Autocomplete: linked collections are shown as chips, distinct from the tags. Searching by collection name also finds the prompts.
+- New setting *When I pick a prompt that has collections*: do nothing / offer to load its collection (default; a **Load collection X** button in the insert toast) / load the first one automatically.
+- New setting *When a collection is loaded in Reference Library*: do nothing (default, because Reference Library offers its prompts itself) / also offer the linked prompts here. It never overwrites the prompt without a click.
+- Python API for other plugins: `sys.modules["wan2gp_prompt_library_api"]` (API_VERSION 1):
+  - `list_prompts`, `prompts_for_collection`, `set_collection_prompts`, `collections_for_prompt`, `set_prompt_collections`, `get_prompt`, `revision`.
+  - Thread-safe, with atomic saves.
+- JS events:
+  - Listens for `promptlib:apply` {id}.
+  - Emits `promptlib:applied` and `promptlib:changed`. `promptlib:changed` also fires for Python-API changes, because the page polls a revision counter every 3 s while visible.
+  - Dispatches `reflib:apply` {id}.
+  - Listens for `reflib:changed` and `reflib:applied`.
+- Reference Library is looked up lazily at call time. If it is missing or has another API version, all collection UI is hidden and the plugin works as before.
+- Links to unknown or deleted collections are ignored and **never pruned automatically**, so undoing a deletion in Reference Library restores them. Saving a prompt keeps them too.
+- The "Category / collection" field is now just "Category", to avoid confusion with Reference Library collections.
+
 ## 1.0.1 — 2026-10-08
 
 - Interface redesign so the plugin looks native in WanGP's **dark** and light themes (no behaviour changes).
