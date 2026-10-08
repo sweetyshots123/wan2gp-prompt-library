@@ -1,0 +1,6 @@
+settings.json
+settings.json.tmp
+library.json
+library.json.tmp
+__pycache__/
+*.pyc

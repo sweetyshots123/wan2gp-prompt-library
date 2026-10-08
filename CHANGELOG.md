@@ -1,0 +1,14 @@
+# Changelog
+
+## 1.0.0 — 2026-10-08
+
+- First release.
+- Autocomplete search box next to WanGP's main prompt (and the queue Edit tab): multi-word AND search across title, tags and text; accent-insensitive and case-insensitive; title/tag matches ranked above body matches, then by recent/frequent use.
+- Keyboard navigation (↑↓ Enter Esc) and mouse selection; highlighted snippet in the dropdown.
+- Insert modes: replace (default), append, or insert at cursor (best effort).
+- Optional Undo toast after inserting.
+- “Save current prompt” button next to the search box.
+- Manager tab: list/filter, create, edit, duplicate, delete (with DELETE confirmation), import/export JSON and plain text.
+- Persistent `library.json` in the plugin folder (atomic writes, not shipped in the zip). Ships with 3 clearly labeled `[Example]` prompts that can be deleted.
+- Settings in `settings.json` (merged from defaults). Language / Idioma: Auto / English / Español.
+- Coexists with Dragger, Vidosser and Reference Library (own CSS/JS namespaces: `plib-*` / `window.promptLibrary`).
