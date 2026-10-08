@@ -34,7 +34,7 @@ from shared.utils.plugins import WAN2GPPlugin
 
 from . import storage
 
-PLUGIN_VERSION = "1.2.0"
+PLUGIN_VERSION = "1.2.1"
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(_PLUGIN_DIR, "settings.json")
 
@@ -108,6 +108,17 @@ TEXT = {
         "meta_saved": "“{title}” updated",
         "save_undone": "Change undone",
         "bar_title": "Prompt Library",
+        "tag_renamed": "Tag “{old}” renamed to “{new}” in {n} {prompts}",
+        "tag_merged": "Tag “{old}” merged into “{new}” in {n} {prompts}",
+        "tag_same": "Nothing to rename",
+        "prompt_renamed": "Prompt renamed to “{title}”",
+        "need_title": "The title cannot be empty",
+        "prompt_1": "prompt", "prompt_n": "prompts",
+        "mgr_tags_sec": "### Tags",
+        "mgr_tag_old": "Tag",
+        "mgr_tag_new": "New name",
+        "mgr_tag_rename": "Rename",
+        "mgr_tag_pick": "Pick a tag to rename",
         "bar_search_ph": "Search prompts…",
         "bar_save": "Save",
         "bar_save_as": "Save as…",
@@ -189,6 +200,17 @@ TEXT = {
         "meta_saved": "«{title}» actualizado",
         "save_undone": "Cambio deshecho",
         "bar_title": "Prompt Library",
+        "tag_renamed": "Etiqueta «{old}» renombrada a «{new}» en {n} {prompts}",
+        "tag_merged": "Etiqueta «{old}» fusionada con «{new}» en {n} {prompts}",
+        "tag_same": "Nada que renombrar",
+        "prompt_renamed": "Prompt renombrado a «{title}»",
+        "need_title": "El título no puede estar vacío",
+        "prompt_1": "prompt", "prompt_n": "prompts",
+        "mgr_tags_sec": "### Etiquetas",
+        "mgr_tag_old": "Etiqueta",
+        "mgr_tag_new": "Nombre nuevo",
+        "mgr_tag_rename": "Renombrar",
+        "mgr_tag_pick": "Elige una etiqueta para renombrar",
         "bar_search_ph": "Buscar prompts…",
         "bar_save": "Guardar",
         "bar_save_as": "Guardar como…",
@@ -366,6 +388,26 @@ def _api_set_prompt_collections(prompt_id, collection_ids):
         raise ValueError(str(e)) from e
 
 
+def _api_rename_tag(old, new):
+    """Rename a tag on every prompt (merges when a prompt already has `new`). Raises ValueError on bad names."""
+    try:
+        out = storage.rename_tag(old, new)
+    except storage.StorageError as e:
+        raise ValueError(str(e)) from e
+    return {k: out[k] for k in ("old", "new", "count", "merged")}
+
+
+def tag_rename_toast(lang, out):
+    if not out.get("count"):
+        return tr(lang, "tag_same")
+    return tr(lang, "tag_merged" if out.get("merged") else "tag_renamed", old=out["old"], new=out["new"], n=out["count"],
+              prompts=tr(lang, "prompt_1" if out["count"] == 1 else "prompt_n"))
+
+
+def tag_choices():
+    return [(f"{tag} ({n})", tag) for tag, n in storage.tag_counts()]
+
+
 def register_api():
     """Expose sys.modules["wan2gp_prompt_library_api"]. Every write is thread-safe (storage lock), saved atomically
     and bumps storage.revision(); the open page polls it and emits the JS event `promptlib:changed`."""
@@ -382,6 +424,7 @@ def register_api():
     mod.set_collection_prompts = _api_set_collection_prompts
     mod.collections_for_prompt = _api_collections_for_prompt
     mod.set_prompt_collections = _api_set_prompt_collections
+    mod.rename_tag = _api_rename_tag
     mod.revision = storage.revision
     sys.modules[API_MODULE_NAME] = mod
     return mod
@@ -573,6 +616,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         "mgr_category", "mgr_new", "mgr_save", "mgr_dup", "mgr_del", "mgr_refresh",
         "mgr_import", "mgr_export_json", "mgr_export_txt", "mgr_confirm_del", "mgr_io",
         "mgr_collections", "sec_reflib", "on_pick_collection", "on_reflib_applied",
+        "mgr_tags_sec", "mgr_tag_old", "mgr_tag_new", "mgr_tag_rename",
     )
 
     @staticmethod
@@ -613,6 +657,10 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             "sec_reflib": {"value": t("sec_reflib")},
             "on_pick_collection": {"label": t("on_pick_collection"), "choices": pick_collection_choices(lang)},
             "on_reflib_applied": {"label": t("on_reflib_applied"), "choices": reflib_applied_choices(lang)},
+            "mgr_tags_sec": {"value": t("mgr_tags_sec")},
+            "mgr_tag_old": {"label": t("mgr_tag_old")},
+            "mgr_tag_new": {"label": t("mgr_tag_new")},
+            "mgr_tag_rename": {"value": t("mgr_tag_rename")},
         }
 
     def tab_updates(self, lang):
@@ -658,6 +706,13 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                     ui["mgr_del"] = gr.Button(tx["mgr_del"]["value"], size="sm", variant="stop", elem_id="plib_mgr_del")
                 ui["mgr_confirm_del"] = gr.Textbox(value="", elem_id="plib_mgr_confirm_del", **tx["mgr_confirm_del"])
                 mgr_status = gr.Markdown("", elem_id="plib_mgr_status")
+                with gr.Group(elem_id="plib_mgr_tags_sec"):
+                    ui["mgr_tags_sec"] = gr.Markdown(tx["mgr_tags_sec"]["value"], elem_classes=["plib-sec"])
+                    with gr.Row(equal_height=True, elem_classes=["plib-mgr-tagrow"]):
+                        ui["mgr_tag_old"] = gr.Dropdown(choices=tag_choices(), value=None, scale=2, elem_id="plib_mgr_tag_old", **tx["mgr_tag_old"])
+                        ui["mgr_tag_new"] = gr.Textbox(scale=2, elem_id="plib_mgr_tag_new", **tx["mgr_tag_new"])
+                        ui["mgr_tag_rename"] = gr.Button(tx["mgr_tag_rename"]["value"], size="sm", variant="secondary", scale=0, min_width=110,
+                                                         elem_id="plib_mgr_tag_rename")
                 with gr.Group(elem_id="plib_mgr_io"):
                     with gr.Row(elem_id="plib_mgr_io_row"):
                         ui["mgr_import"] = gr.Button(tx["mgr_import"]["value"], size="sm", variant="secondary", elem_id="plib_mgr_import")
@@ -971,6 +1026,25 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }")
         # Library changed elsewhere (bar Save / Save as / tags, Python API, another browser): refresh the list and, when the
         # page says the editor holds no unsaved edits ("reload"), the selected prompt's fields too.
+        def do_rename_tag(old, new, query, pid, browser=""):
+            lang2 = resolve_lang(load_settings()["language"], browser)
+            if not old:
+                return tr(lang2, "mgr_tag_pick"), gr.update(), gr.update(), gr.update(), _library_json_for_client()
+            try:
+                out = storage.rename_tag(old, new)
+            except storage.StorageError as e:
+                return f"❌ {e}", gr.update(), gr.update(), gr.update(), _library_json_for_client()
+            value = next((t for t, _ in storage.tag_counts() if storage._fold(t) == storage._fold(out["new"])), None)
+            return (tag_rename_toast(lang2, out), gr.update(choices=tag_choices(), value=value), "",
+                    refresh_list(query or "", pid or None), _library_json_for_client())
+
+        ui["mgr_tag_rename"].click(
+            fn=do_rename_tag, inputs=[ui["mgr_tag_old"], ui["mgr_tag_new"], ui["mgr_search"], selected_id, browser_lang],
+            outputs=[mgr_status, ui["mgr_tag_old"], ui["mgr_tag_new"], ui["mgr_list"], library_json], show_progress="hidden",
+            js="(o, n, q, pid, b) => [o, n, q, pid, navigator.language || '']",
+        ).then(fn=None, inputs=[library_json], outputs=None,
+               js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }")
+
         def ext_refresh(query, pid, flag):
             out = [refresh_list(query or "", pid or None)]
             if flag == "reload" and pid:
@@ -982,11 +1056,17 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                     pass
             return out + [gr.skip()] * 5
 
+        def ext_refresh_all(query, pid, flag, tag_value):
+            choices = tag_choices()
+            keep = tag_value if any(c[1] == tag_value for c in choices) else None
+            return ext_refresh(query, pid, flag) + [gr.update(choices=choices, value=keep)]
+
         mgr_ext_btn.click(
-            fn=ext_refresh, inputs=[ui["mgr_search"], selected_id, mgr_ext_flag],
-            outputs=[ui["mgr_list"], ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], ui["mgr_collections"]],
+            fn=ext_refresh_all, inputs=[ui["mgr_search"], selected_id, mgr_ext_flag, ui["mgr_tag_old"]],
+            outputs=[ui["mgr_list"], ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], ui["mgr_collections"],
+                     ui["mgr_tag_old"]],
             show_progress="hidden", queue=False,
-            js="(q, pid, f) => [q, pid, (window.promptLibrary && window.promptLibrary._mgrFlag()) || '']",
+            js="(q, pid, f, tv) => [q, pid, (window.promptLibrary && window.promptLibrary._mgrFlag()) || '', tv]",
         )
         ui["mgr_export_json"].click(
             fn=do_export_json, inputs=[browser_lang], outputs=[import_box, mgr_status], show_progress="hidden",
@@ -1057,6 +1137,10 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                 return self._action_update_text(tab, req, prompt_val, wizard_val, lang)
             if action == "set_meta":
                 return self._action_set_meta(tab, req, prompt_val, wizard_val, lang)
+            if action == "rename_prompt":
+                return self._action_rename_prompt(tab, req, prompt_val, wizard_val, lang)
+            if action == "rename_tag":
+                return self._action_rename_tag(tab, req, prompt_val, wizard_val, lang)
             if action == "undo_save":
                 return self._action_undo_save(tab, req, prompt_val, wizard_val, lang)
             if action == "mark_used":
@@ -1271,6 +1355,28 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         resp.update(self._lib_resp())
         return self._pack(tab, resp, prompt_val, wizard_val, None, None)
 
+    def _action_rename_prompt(self, tab, req, prompt_val, wizard_val, lang):
+        """Rename THAT prompt (same id; text, tags and collections untouched)."""
+        before = storage.get_prompt(req.get("id"))
+        title = " ".join(str(req.get("title") or "").split())
+        if not title or not storage._safe_title(title, fallback=""):
+            return self._pack(tab, {"ok": False, "error": tr(lang, "need_title")}, prompt_val, wizard_val, None, None)
+        item = storage.update_prompt(before["id"], title=title)
+        resp = {"ok": True, "toast": tr(lang, "prompt_renamed", title=item["title"]), "item": item, "id": req.get("req_id")}
+        if item["title"] != before["title"]:
+            resp["save_undo_id"] = self._remember_save("title", item["id"], {"title": before["title"]})
+        resp.update(self._lib_resp())
+        return self._pack(tab, resp, prompt_val, wizard_val, None, None)
+
+    def _action_rename_tag(self, tab, req, prompt_val, wizard_val, lang):
+        out = storage.rename_tag(req.get("old"), req.get("new"))
+        resp = {"ok": True, "toast": tag_rename_toast(lang, out), "rename": {k: out[k] for k in ("old", "new", "count", "merged")},
+                "id": req.get("req_id")}
+        if out["count"]:
+            resp["save_undo_id"] = self._remember_save("tags", None, out["before"])
+        resp.update(self._lib_resp())
+        return self._pack(tab, resp, prompt_val, wizard_val, None, None)
+
     def _action_undo_save(self, tab, req, prompt_val, wizard_val, lang):
         with self._lock:
             entry = self._save_undo.pop(req.get("undo_id") or "", None)
@@ -1279,6 +1385,11 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         if entry["kind"] == "create":
             storage.delete_prompt(entry["id"])
             item = None
+        elif entry["kind"] == "tags":
+            storage.restore_tags(entry["before"])
+            item = None
+        elif entry["kind"] == "title":
+            item = storage.update_prompt(entry["id"], title=entry["before"]["title"])
         else:
             b = entry["before"]
             item = storage.update_prompt(entry["id"], title=b["title"], text=b["text"], tags=b["tags"], collections=b["collections"])

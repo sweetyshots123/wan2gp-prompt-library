@@ -55,6 +55,10 @@
             add_coll: "+ collection",
             remove: "Remove",
             no_suggestions: "No more collections",
+            need_title: "The title cannot be empty",
+            rename_tag: "Rename this tag everywhere (double-click)",
+            rename_title: "Rename the loaded prompt (or double-click the box)",
+            rename_ph: "Rename prompt…",
         },
         es: {
             search_ph: "Buscar prompts…",
@@ -101,6 +105,10 @@
             add_coll: "+ colección",
             remove: "Quitar",
             no_suggestions: "No hay más colecciones",
+            need_title: "El título no puede estar vacío",
+            rename_tag: "Renombrar esta etiqueta en todos los prompts (doble clic)",
+            rename_title: "Renombrar el prompt cargado (o doble clic en el cuadro)",
+            rename_ph: "Renombrar prompt…",
         },
     };
     const browserLang = () => String(navigator.language || (navigator.languages && navigator.languages[0]) || "");
@@ -139,7 +147,9 @@
   -webkit-mask: var(--plib-icon-prompt) center / contain no-repeat; mask: var(--plib-icon-prompt) center / contain no-repeat; }
 .plib-bar-status-text { display: flex; justify-content: flex-end; align-items: center; gap: 6px; line-height: 18px; font-size: var(--text-sm, 12px);
   color: var(--body-text-color-subdued); white-space: nowrap; overflow: hidden; min-width: 0; }
-.plib-bar-status-text .plib-st-main { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.plib-bar-status-text .plib-st-main { display: inline-flex; align-items: center; overflow: hidden; min-width: 0; }
+.plib-st-pre, .plib-st-post { flex: none; white-space: pre; }
+.plib-st-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plib-bar-status-text[data-kind="none"] { opacity: .75; }
 .plib-bar-status-text .plib-st-mod { flex: none; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: #b45309 !important; }
 .dark .plib-bar-status-text .plib-st-mod { color: #fbbf24 !important; }
@@ -189,6 +199,15 @@
 .plib-echip-x { all: unset; cursor: pointer; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; opacity: .7; flex: none; }
 .plib-echip-x:hover, .plib-echip-x:focus-visible { opacity: 1; background: rgba(127,127,127,.25); }
 .plib-echip-x svg { width: 9px; height: 9px; }
+.plib-echip-renamable .plib-echip-text { cursor: text; }
+.plib-echip-pen { all: unset; cursor: pointer; width: 0; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  opacity: 0; overflow: hidden; flex: none; transition: width 90ms ease, opacity 90ms ease; }
+.plib-echip:hover .plib-echip-pen, .plib-echip-pen:focus-visible { width: 18px; opacity: .75; }
+.plib-echip-pen:hover { opacity: 1 !important; background: rgba(127,127,127,.25); }
+.plib-echip-pen svg { width: 11px; height: 11px; }
+.plib-echip.editing { padding: 0 3px; box-shadow: inset 0 0 0 1px var(--plib-acc, var(--plib-accent)), 0 0 0 1px var(--plib-acc, var(--plib-accent)); }
+input.plib-echip-edit { all: unset; box-sizing: border-box; height: 22px; padding: 0 8px; border-radius: 11px; font-size: var(--text-sm, 12px);
+  color: var(--body-text-color, var(--plib-fg)); background: var(--plib-input, var(--plib-input-bg)); }
 input.plib-echip-add { all: unset; box-sizing: border-box; height: 26px; width: 118px; padding: 0 10px; border-radius: 13px; font-size: var(--text-sm, 12px);
   color: var(--body-text-color, var(--plib-fg)); background: transparent; box-shadow: inset 0 0 0 1px var(--plib-bd, var(--plib-border)); border: 0; }
 input.plib-echip-add::placeholder { color: var(--body-text-color-subdued, var(--plib-subdued)); opacity: 1; }
@@ -211,6 +230,21 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
   border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; color: var(--body-text-color-subdued); }
 .plib-clear:hover { color: var(--body-text-color); background: var(--background-fill-secondary); }
 .plib-clear.show { display: flex; }
+.plib-rename-btn { all: unset; position: absolute; right: 7px; top: 50%; transform: translateY(-50%); z-index: 3; width: 22px; height: 22px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center; cursor: pointer; color: var(--body-text-color-subdued); }
+.plib-rename-btn svg { width: 12px; height: 12px; }
+.plib-rename-btn:hover, .plib-rename-btn:focus-visible { color: var(--body-text-color); background: var(--background-fill-secondary); }
+.plib-search-box.plib-has-current .plib-rename-btn { display: flex; }
+.plib-search-box.plib-has-current .plib-clear { right: 31px; }
+.plib-search-box.plib-has-current :is(input, textarea) { padding-right: 56px !important; }
+.plib-search-box :is(input, textarea).plib-current { color: var(--body-text-color) !important; font-weight: 600 !important; text-overflow: ellipsis; }
+/* rename mode: amber frame, pencil instead of the magnifier, no dropdown */
+/* :is(#plib-x) lifts specificity to id level so Gradio's focus ring can't win */
+.plib-search-box.plib-renaming :is(input, textarea, #plib-x#plib-y), .plib-search-box.plib-renaming :is(input, textarea, #plib-x#plib-y):focus {
+  box-shadow: inset 0 0 0 1px #d97706, 0 0 0 2px rgba(245, 158, 11, .55) !important; }
+.plib-search-box.plib-renaming::before { background: #f59e0b !important; opacity: 1 !important;
+  -webkit-mask: var(--plib-icon-pen) center / contain no-repeat !important; mask: var(--plib-icon-pen) center / contain no-repeat !important; }
+.plib-search-box.plib-renaming .plib-rename-btn { color: #f59e0b; }
 .plib-clear svg { width: 10px; height: 10px; }
 :root { --plib-icon-images: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='5' width='18' height='14' rx='2' fill='none' stroke='black' stroke-width='2.4'/%3E%3Cpath d='M5 17l5-5 4 4 2-2 3 3' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='15.5' cy='9.5' r='1.6' fill='black'/%3E%3C/svg%3E"); }
 :root { --plib-icon-prompt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5h16v11H9l-5 4V5Z'/%3E%3Cpath d='M8 9h8M8 12h5'/%3E%3C/svg%3E");
@@ -218,6 +252,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
   --plib-icon-saveas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 21H3V3h12l4 4v5M7 3v6h8V3M7 21v-6h5M18 15v6M15 18h6'/%3E%3C/svg%3E");
   --plib-icon-manage: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1'/%3E%3Ccircle cx='15' cy='6' r='2'/%3E%3Ccircle cx='9' cy='12' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E");
   --plib-icon-tag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12V3h9l9 9-9 9-9-9Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5' fill='black'/%3E%3C/svg%3E"); }
+:root { --plib-icon-pen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4' fill='none' stroke='black' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E"); }
 :root { --plib-icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5' fill='none' stroke='black' stroke-width='2.4'/%3E%3Cpath d='M15.5 15.5L21 21' stroke='black' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
 /* ---- DOM-only fallback bar (only used if the Gradio bar could not be inserted) */
 .plib-wrap.plib-fallback { display: flex; gap: 6px; align-items: center; margin: 6px 0; padding: 4px; border-radius: var(--block-radius);
@@ -689,6 +724,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
     // so it is never clipped or painted under the Gradio blocks that follow the prompt.
     const mounts = new Map(); // tab -> { wrap, input, dd, saveBtn, manageBtn, clearBtn, activeIdx, results }
     const X_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>';
+    const PEN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>';
     function setInputValue(input, value) {
         const proto = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
         const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
@@ -735,6 +771,14 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             clearBtn.innerHTML = X_SVG;
             box.appendChild(clearBtn);
         }
+        let renBtn = box.querySelector(".plib-rename-btn");
+        if (!renBtn) {
+            renBtn = document.createElement("button");
+            renBtn.type = "button";
+            renBtn.className = "plib-rename-btn";
+            renBtn.innerHTML = PEN_SVG;
+            box.appendChild(renBtn);
+        }
         const saveBtn = wrap.querySelector(".plib-save-btn");
         const saveAsBtn = wrap.querySelector(".plib-saveas-btn");
         const manageBtn = wrap.querySelector(".plib-manage-btn");
@@ -743,16 +787,39 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         dd.dataset.tab = tab;
         dd.setAttribute("role", "listbox");
         document.body.appendChild(dd);
-        const state = { tab, wrap, input, dd, saveBtn, saveAsBtn, manageBtn, clearBtn, activeIdx: -1, results: [] };
+        const state = { tab, wrap, input, box, dd, saveBtn, saveAsBtn, manageBtn, clearBtn, renBtn, activeIdx: -1, results: [] };
         mounts.set(tab, state);
         relabel(state);
-        const syncClear = () => clearBtn.classList.toggle("show", !!input.value);
-        input.addEventListener("input", () => { syncClear(); if (!state.silent) renderDropdown(state); });
-        input.addEventListener("focus", () => { if (input.value || library.length) renderDropdown(state); });
+        const syncClear = () => clearBtn.classList.toggle("show", !!input.value && !state.showingCurrent && !state.renaming);
+        state.syncClear = syncClear;
+        input.addEventListener("input", () => {
+            syncClear();
+            if (state.silent || state.renaming) return;
+            state.seeded = false;
+            renderDropdown(state);
+        });
+        input.addEventListener("focus", () => {
+            if (state.renaming) return;
+            if (state.showingCurrent) {
+                // The box showed the loaded prompt's title: select it so typing replaces it (search as usual).
+                state.showingCurrent = false;
+                state.seeded = true;
+                input.classList.remove("plib-current");
+                syncClear();
+                setTimeout(() => { if (document.activeElement === input && state.seeded) input.select(); }, 0);
+            }
+            if (input.value || library.length) renderDropdown(state);
+        });
+        input.addEventListener("dblclick", () => { if (!state.renaming && currentItem(tab)) startRename(state); });
+        renBtn.addEventListener("mousedown", (e) => e.preventDefault());
+        renBtn.addEventListener("click", () => { if (state.renaming) finishRename(state, true); else startRename(state); });
         input.addEventListener("keydown", (e) => onKey(state, e));
         input.addEventListener("keyup", (e) => { if (e.key === "Escape") { e.preventDefault(); closeDropdown(state); } });
         input.addEventListener("blur", () => setTimeout(() => {
             if (!dd.matches(":hover") && document.activeElement !== input) closeDropdown(state);
+            if (document.activeElement === input) return;
+            if (state.renaming) finishRename(state, true, true);
+            else showIdle(state);
         }, 180));
         clearBtn.addEventListener("mousedown", (e) => e.preventDefault());
         clearBtn.addEventListener("click", () => { setInputValue(input, ""); syncClear(); input.focus(); renderDropdown(state); });
@@ -794,9 +861,57 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             dd.style.maxHeight = Math.max(120, Math.min(want, above)) + "px";
         }
     }
+    // Idle box = the loaded prompt's title shown as the current value (like Reference Library's select).
+    function showIdle(state) {
+        const item = currentItem(state.tab);
+        const input = state.input;
+        state.box.classList.toggle("plib-has-current", !!item);
+        state.renBtn.title = t("rename_title");
+        state.renBtn.setAttribute("aria-label", t("rename_title"));
+        if (state.renaming || document.activeElement === input) return;
+        if (!item) {
+            if (state.showingCurrent) {
+                state.silent = true; try { setInputValue(input, ""); } finally { state.silent = false; }
+                state.showingCurrent = false; input.classList.remove("plib-current");
+            }
+        } else if (!state.showingCurrent || input.value !== item.title) {
+            state.silent = true; try { setInputValue(input, item.title); } finally { state.silent = false; }
+            state.showingCurrent = true; state.seeded = false; input.classList.add("plib-current");
+        }
+        state.syncClear && state.syncClear();
+    }
+    function startRename(state) {
+        const item = currentItem(state.tab);
+        if (!item) return;
+        closeDropdown(state);
+        state.renaming = true; state.renameId = item.id; state.showingCurrent = false; state.seeded = false;
+        state.input.classList.remove("plib-current");
+        state.box.classList.add("plib-renaming");
+        state.input.placeholder = t("rename_ph");
+        state.silent = true; try { setInputValue(state.input, item.title); } finally { state.silent = false; }
+        state.syncClear();
+        state.input.focus();
+        state.input.select();
+    }
+    async function finishRename(state, save, fromBlur) {
+        if (!state.renaming) return;
+        const item = library.find(p => p.id === state.renameId);
+        const title = state.input.value.replace(/\s+/g, " ").trim();
+        if (save && !title && !fromBlur) { toast(t("need_title"), "error"); return; } // stay in rename mode
+        state.renaming = false;
+        state.box.classList.remove("plib-renaming");
+        state.input.placeholder = t("search_ph");
+        state.silent = true; try { setInputValue(state.input, ""); } finally { state.silent = false; }
+        if (!fromBlur) state.input.blur();
+        showIdle(state);
+        if (!save || !item || !title || title === item.title) return;
+        try { await sendBridge({ action: "rename_prompt", tab: state.tab, id: item.id, title }); }
+        catch (e) { toast(String(e.message || e), "error"); }
+        updateBar(state.tab, true);
+    }
     function relabel(state) {
         if (!state) return;
-        state.input.placeholder = t("search_ph");
+        state.input.placeholder = state.renaming ? t("rename_ph") : t("search_ph");
         const hideSave = cfg.save_current_button === false;
         if (state.saveBtn) { state.saveBtn.textContent = t("save"); state.saveBtn.classList.toggle("plib-hide", hideSave); }
         if (state.saveAsBtn) { state.saveAsBtn.textContent = t("save_as"); state.saveAsBtn.title = t("save_as_title"); state.saveAsBtn.classList.toggle("plib-hide", hideSave); }
@@ -812,7 +927,8 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         position(state);
     }
     function renderDropdown(state) {
-        const q = state.input.value;
+        if (state.renaming) { closeDropdown(state); return; }
+        const q = state.seeded ? "" : state.input.value;
         const results = searchLocal(q, 40);
         state.results = results;
         state.activeIdx = results.length ? 0 : -1;
@@ -852,6 +968,16 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         return title;
     }
     function onKey(state, e) {
+        if (state.renaming) {
+            if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); finishRename(state, true); }
+            else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finishRename(state, false); }
+            return;
+        }
+        if (e.key === "Escape" && currentItem(state.tab) && !state.dd.classList.contains("open")) {
+            // Esc with no pick: back to the loaded title (selected, so typing searches again).
+            state.silent = true; try { setInputValue(state.input, currentItem(state.tab).title); } finally { state.silent = false; }
+            state.seeded = true; state.syncClear(); state.input.select();
+        }
         if (!state.dd.classList.contains("open") && (e.key === "ArrowDown" || e.key === "Enter")) {
             renderDropdown(state);
         }
@@ -892,6 +1018,8 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         state.silent = true;
         try { setInputValue(state.input, ""); } finally { state.silent = false; }
         state.clearBtn && state.clearBtn.classList.remove("show");
+        state.seeded = false;
+        state.input.blur();
         const tab = state.wrap.dataset.tab || activeTab();
         let vars = null;
         if (item.vars && item.vars.length) {
@@ -1023,13 +1151,17 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             if (!item) html = `<div class="plib-bar-status-text" data-kind="none"><span class="plib-st-main">${escapeHtml(t("st_none"))}</span></div>`;
             else {
                 const main = t("st_loaded", { title: item.title });
+                const [pre, post] = t("st_loaded").split("{title}");
                 html = `<div class="plib-bar-status-text" data-kind="${modified ? "modified" : "ok"}" title="${escapeHtml(main)}">`
-                    + `<span class="plib-st-main">${escapeHtml(main)}</span>`
+                    + `<span class="plib-st-main"><span class="plib-st-pre">${escapeHtml(pre || "")}</span>`
+                    + `<span class="plib-st-title">${escapeHtml(item.title)}</span>`
+                    + `<span class="plib-st-post">${escapeHtml(post || "")}</span></span>`
                     + (modified ? `<span class="plib-st-mod" title="${escapeHtml(t("st_modified_title"))}">${escapeHtml(t("st_modified"))}</span>` : "")
                     + `</div>`;
             }
             if (force || state.statusHtml !== html || st.innerHTML !== html) { st.innerHTML = html; state.statusHtml = html; }
         }
+        showIdle(state);
         state.wrap.dataset.current = item ? item.id : "";
         state.wrap.dataset.modified = modified ? "1" : "0";
         if (state.saveBtn) {
@@ -1039,14 +1171,6 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         renderMeta(state, item, force);
     }
     function updateAllBars() { for (const tab of mounts.keys()) updateBar(tab); }
-    document.addEventListener("input", (e) => {
-        const el = e.target;
-        if (el && el.closest && el.closest("#wangp-prompt-advanced, #wangp-prompt-wizard")) {
-            clearTimeout(updateAllBars._t);
-            updateAllBars._t = setTimeout(updateAllBars, 120);
-        }
-    }, true);
-
     // ---- details row: tags + collections of the current prompt, edited inline and saved immediately (with Undo)
     function visibleLinks(item) { return linkedCollections(item).map(c => c.id); }
     function metaSig(item) {
@@ -1057,6 +1181,9 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         if (!box) return;
         const sig = metaSig(item);
         if (!force && sig === state.metaSig && box.isConnected && (sig === "" || box.querySelector(".plib-meta"))) return;
+        // A tag/collection save is in flight: the library snapshot is older than the chips, so don't rebuild from it
+        // (a quick second edit would send the stale list). saveMeta forces a refresh once the last save returns.
+        if (state.metaPending > 0 && sig !== "" && box.querySelector(".plib-meta")) return;
         state.metaSig = sig;
         const focused = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.kind : null;
         (state.editors || []).forEach(ed => ed.destroy());
@@ -1081,6 +1208,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         group("tags", t("tags"), chipEditor({
             kind: "tags", values: item.tags || [], placeholder: t("add_tag"), allowFree: true, suggest: tagSuggestions,
             onChange: (vals) => { state.metaSig = metaSig(Object.assign({}, item, { tags: vals })); saveMeta(state.tab, id, { tags: vals }); },
+            onRename: (oldName, newName) => renameTag(state.tab, oldName, newName),
         }));
         if (collections) {
             group("coll", t("collections"), chipEditor({
@@ -1095,10 +1223,18 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         box.appendChild(row);
         if (focused) { const inp = box.querySelector(`input.plib-echip-add[data-kind="${focused}"]`); if (inp) inp.focus(); }
     }
-    async function saveMeta(tab, id, fields) {
-        try { await sendBridge(Object.assign({ action: "set_meta", tab, id }, fields)); }
+    async function renameTag(tab, oldName, newName) {
+        try { await sendBridge({ action: "rename_tag", tab, old: oldName, new: newName }); }
         catch (e) { toast(String(e.message || e), "error"); }
         updateBar(tab, true);
+    }
+    async function saveMeta(tab, id, fields) {
+        const st = mounts.get(tab);
+        if (st) st.metaPending = (st.metaPending || 0) + 1;
+        try { await sendBridge(Object.assign({ action: "set_meta", tab, id }, fields)); }
+        catch (e) { toast(String(e.message || e), "error"); }
+        finally { if (st) st.metaPending--; }
+        if (!st || !st.metaPending) updateBar(tab, true);
     }
     function tagSuggestions(query, have) {
         const counts = new Map();
@@ -1152,9 +1288,48 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
                 x.setAttribute("aria-label", x.title);
                 x.innerHTML = X_SVG;
                 x.addEventListener("click", (e) => { e.preventDefault(); vals = vals.filter(o => o !== v); render(); emit(); });
-                chip.append(tx, x);
+                if (opts.onRename) {
+                    // Rename the tag itself (every prompt), not a new tag: double-click or the pencil -> inline field.
+                    chip.classList.add("plib-echip-renamable");
+                    tx.title = t("rename_tag");
+                    const pen = document.createElement("button");
+                    pen.type = "button";
+                    pen.className = "plib-echip-pen";
+                    pen.title = t("rename_tag");
+                    pen.setAttribute("aria-label", t("rename_tag") + ": " + v);
+                    pen.innerHTML = PEN_SVG;
+                    pen.addEventListener("click", (e) => { e.preventDefault(); startRename(chip, v); });
+                    tx.addEventListener("dblclick", (e) => { e.preventDefault(); startRename(chip, v); });
+                    chip.append(tx, pen, x);
+                } else chip.append(tx, x);
                 root.insertBefore(chip, input);
             }
+        }
+        function startRename(chip, old) {
+            if (chip.querySelector(".plib-echip-edit")) return;
+            const field = document.createElement("input");
+            field.className = "plib-echip-edit";
+            field.value = old;
+            field.dataset.old = old;
+            field.setAttribute("spellcheck", "false");
+            field.style.width = Math.max(60, Math.min(220, old.length * 8 + 24)) + "px";
+            chip.classList.add("editing");
+            chip.replaceChildren(field);
+            field.focus();
+            field.select();
+            let done = false;
+            const finish = (save) => {
+                if (done) return;
+                done = true;
+                const name = field.value.replace(/\s+/g, " ").trim();
+                render();
+                if (save && name && name !== old) opts.onRename(old, name);
+            };
+            field.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); finish(true); }
+                else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+            });
+            field.addEventListener("blur", () => finish(true));
         }
         function add(v) {
             v = String(v || "").trim();
@@ -1427,6 +1602,13 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             const b = document.getElementById("plib_poll");
             if (b) b.click();
         }, 3000);
+        // Typing in WanGP's prompt: refresh the "modificado" indicator right away (debounced) instead of waiting for the poll.
+        let typeT = null;
+        document.addEventListener("input", (e) => {
+            const el = e.target;
+            if (!el || el.tagName !== "TEXTAREA" || (el.closest && el.closest(".plib-panel, .plib-bar, .plib-dd"))) return;
+            clearTimeout(typeT); typeT = setTimeout(updateAllBars, 150);
+        }, true);
         // Re-check mounts as Gradio re-renders the form on model changes.
         setInterval(() => {
             loadTargets();

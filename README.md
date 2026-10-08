@@ -1,6 +1,6 @@
 # Prompt Library — reusable text prompts for Wan2GP
 
-*[Español](README.es.md)* · MIT License · v1.2.0
+*[Español](README.es.md)* · MIT License · v1.2.1
 
 **Prompt Library** is a plugin for [Wan2GP / WanGP](https://github.com/deepbeepmeep/Wan2GP) that turns your best prompts into a searchable library of templates.
 
@@ -34,6 +34,8 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 - **Save** overwrites the loaded prompt with WanGP's current text. The toast has **Undo**. If nothing is loaded, Save works like *Save as…*. If there are no changes, it just says so. If you save over a template whose `{variables}` are gone from the text, it asks first.
 - **Save as…** creates a **new** prompt from the current text and leaves the loaded one unchanged. Its dialog has the title (prefilled “X (copy)”), the tags and the Reference Library collections of the loaded prompt as a starting point, and a preview of the text. The new prompt becomes the current one. **Undo** in the toast deletes it again.
 - **Inline details:** under the bar, the current prompt's **tags** are chips with × plus a “+ tag” field that autocompletes from your existing tags. When Reference Library 1.1+ is present, its **collections** get the same editor, with a picker limited to the existing collections. Changes are saved immediately and the toast has **Undo**. The *Save as…* dialog uses the same chip editors, but there nothing is saved until you confirm.
+- **The search box shows the loaded prompt (1.2.1):** when idle, it displays the loaded prompt's title as its value. Focusing selects the title so typing searches as usual; Esc or clicking away without a pick brings the title back. **Rename** it with the small pencil inside the box (next to the clear ×) or by double-clicking the box. The box turns amber and shows *Rename prompt…* with no dropdown. Enter saves, Esc cancels, and an empty title is rejected. This renames **that** prompt: same id, with text, tags and collections untouched. The toast has **Undo**, and the manager, the autocomplete and Reference Library's chips refresh. In the status, long titles are truncated with an ellipsis.
+- **Rename a tag everywhere (1.2.1):** double-click a tag chip in the bar (or click the small pencil that appears on hover). It becomes a text field: **Enter** or clicking away saves, **Esc** cancels. Saving renames that tag on **every** prompt; it does not create a new tag. Tags match case- and accent-insensitively, like everywhere else. If a prompt already has the new name, the two merge and the toast says “merged”. **Undo** restores the exact previous tags on every affected prompt. The manager has the same tool in its **Tags** section: pick a tag (shown with its count), type the new name and press **Rename**. The *Save as…* dialog only edits the new prompt's own tag list.
 - Every change fires `promptlib:changed`, so the manager tab refreshes its list, and its editor too unless it holds unsaved edits. Reference Library and other open pages refresh as well.
 
 **Manager (Prompt Library tab, or the Manage button)**
@@ -64,7 +66,7 @@ If [Reference Library](https://github.com/sweetyshots123/wan2gp-reference-librar
 
 Links live only in Prompt Library's `library.json` (`collections: [collection id, …]` per prompt; schema 2). Old 1.0.x files are migrated transparently.
 
-**Python:** `sys.modules["wan2gp_prompt_library_api"]`, `API_VERSION = 1`. All writes are thread-safe and saved atomically.
+**Python:** `sys.modules["wan2gp_prompt_library_api"]`, `API_VERSION = 1` (1.2.1 adds `rename_tag(old, new)` → `{old, new, count, merged}`). All writes are thread-safe and saved atomically.
 
 | Function | Returns / does |
 |---|---|

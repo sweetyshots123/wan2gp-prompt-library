@@ -519,6 +519,80 @@ def import_plain_text(raw: str, path: Optional[str] = None) -> Tuple[int, int]:
     return added, skipped
 
 
+# ---------------------------------------------------------------- tags (global rename)
+def _clean_tag(name) -> str:
+    text = re.sub(r"\s+", " ", str(name or "").strip().strip("#")).strip()
+    if not text:
+        raise StorageError("tag name required")
+    if _TAG_SPLIT.search(text):
+        raise StorageError("a tag name cannot contain , ; or line breaks")
+    return text[:64]
+
+
+def tag_counts(path: Optional[str] = None) -> List[Tuple[str, int]]:
+    """[(tag, number of prompts)] — one entry per tag (compared like everywhere else: case- and accent-insensitive),
+    spelled as its first occurrence; most used first."""
+    counts: Dict[str, List[Any]] = {}
+    for item in list_prompts(path):
+        for tag in item.get("tags") or []:
+            entry = counts.setdefault(_fold(tag), [tag, 0])
+            entry[1] += 1
+    return sorted(((v[0], v[1]) for v in counts.values()), key=lambda x: (-x[1], _fold(x[0])))
+
+
+def rename_tag(old: str, new: str, path: Optional[str] = None) -> Dict[str, Any]:
+    """Rename a tag on EVERY prompt (one atomic save, one revision bump, reason "tags").
+    Tags match case- and accent-insensitively (like _normalize_tags). When a prompt already has `new`, both merge into
+    one (no duplicate). Returns {old, new, count, merged, before: {prompt_id: previous tags}} (before = undo data)."""
+    old_key = _fold(str(old or "").strip().strip("#"))
+    if not old_key.strip():
+        raise StorageError("tag name required")
+    new_tag = _clean_tag(new)
+    new_key = _fold(new_tag)
+    with _lock:
+        lib = load_library(path)
+        before: Dict[str, List[str]] = {}
+        exists_elsewhere = False
+        for item in lib["prompts"]:
+            tags = list(item.get("tags") or [])
+            keys = [_fold(t) for t in tags]
+            if old_key not in keys:
+                if new_key in keys and new_key != old_key:
+                    exists_elsewhere = True
+                continue
+            if new_key in keys and new_key != old_key:
+                exists_elsewhere = True
+            replaced = [new_tag if k == old_key else t for t, k in zip(tags, keys)]
+            normalized = _normalize_tags(replaced)  # merges a duplicate `new` (keeps the first position)
+            if normalized != tags:
+                before[item["id"]] = tags
+                item["tags"] = normalized
+                item["updated"] = _now()
+        if not before:
+            if not any(old_key in [_fold(t) for t in (p.get("tags") or [])] for p in lib["prompts"]):
+                raise StorageError("tag not found")
+            return {"old": str(old), "new": new_tag, "count": 0, "merged": False, "before": {}}
+        save_library(lib, path, "tags", None)
+    return {"old": str(old), "new": new_tag, "count": len(before), "merged": exists_elsewhere, "before": before}
+
+
+def restore_tags(before: Dict[str, List[str]], path: Optional[str] = None) -> int:
+    """Undo for rename_tag: put back exactly the previous tag lists (one save). Returns how many prompts changed."""
+    if not before:
+        return 0
+    with _lock:
+        lib = load_library(path)
+        n = 0
+        for item in lib["prompts"]:
+            if item["id"] in before:
+                item["tags"] = _normalize_tags(before[item["id"]])
+                item["updated"] = _now()
+                n += 1
+        if n:
+            save_library(lib, path, "tags", None)
+    return n
+
+
 # ---------------------------------------------------------------- collection links (Reference Library)
 def collections_for_prompt(prompt_id: str, path: Optional[str] = None) -> List[str]:
     return list(get_prompt(prompt_id, path).get("collections") or [])

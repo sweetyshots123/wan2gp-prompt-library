@@ -1,6 +1,6 @@
 # Prompt Library — prompts de texto reutilizables para Wan2GP
 
-*[English](README.md)* · Licencia MIT · v1.2.0
+*[English](README.md)* · Licencia MIT · v1.2.1
 
 **Prompt Library** es un plugin para [Wan2GP / WanGP](https://github.com/deepbeepmeep/Wan2GP) que convierte tus mejores prompts en una librería de plantillas buscable.
 
@@ -34,6 +34,8 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 - **Guardar** sobrescribe el prompt cargado con el texto actual de WanGP. El aviso trae **Deshacer**. Si no hay ninguno cargado, Guardar funciona como *Guardar como…*. Si no hay cambios, solo lo indica. Si guardas encima de una plantilla y sus `{variables}` ya no están en el texto, pregunta antes.
 - **Guardar como…** crea un prompt **nuevo** con el texto actual y deja el cargado sin cambios. Su diálogo tiene el título (con «X (copia)» ya escrito), las etiquetas y las colecciones de Reference Library del cargado como punto de partida, y una vista previa del texto. El nuevo pasa a ser el actual. **Deshacer** en el aviso lo borra de nuevo.
 - **Detalles en línea:** bajo la barra, las **etiquetas** del prompt actual aparecen como chips con × y un campo «+ etiqueta» que autocompleta con tus etiquetas existentes. Si está Reference Library 1.1+, sus **colecciones** tienen el mismo editor, con un selector limitado a las colecciones existentes. Los cambios se guardan al momento y el aviso trae **Deshacer**. El diálogo *Guardar como…* usa los mismos editores de chips, pero ahí no se guarda nada hasta que confirmas.
+- **El cuadro de búsqueda muestra el prompt cargado (1.2.1):** en reposo, muestra el título del prompt cargado como valor. Al enfocarlo, el título queda seleccionado y al escribir se busca como siempre; Esc o hacer clic fuera sin elegir nada recupera el título. Para **renombrarlo**, usa el pequeño lápiz dentro del cuadro (junto a la ×) o haz doble clic en el cuadro. El cuadro se vuelve ámbar y muestra *Renombrar prompt…* sin desplegable. Enter guarda, Esc cancela, y un título vacío se rechaza. Renombra **ese** prompt: mismo id, con el texto, las etiquetas y las colecciones intactos. El aviso trae **Deshacer**, y el gestor, el autocompletado y los chips de Reference Library se refrescan. En el estado, los títulos largos se recortan con puntos suspensivos.
+- **Renombrar una etiqueta en todas partes (1.2.1):** doble clic sobre un chip de etiqueta en la barra (o en el pequeño lápiz que aparece al pasar el ratón). Se convierte en un campo de texto: **Enter** o hacer clic fuera guarda, **Esc** cancela. Guardar renombra esa etiqueta en **todos** los prompts; no crea una etiqueta nueva. Las etiquetas se comparan sin distinguir mayúsculas ni acentos, como en el resto del plugin. Si un prompt ya tiene el nombre nuevo, se fusionan y el aviso dice «fusionada». **Deshacer** restaura exactamente las etiquetas anteriores en cada prompt afectado. El gestor tiene la misma herramienta en su sección **Etiquetas**: elige una etiqueta (con su número de prompts), escribe el nombre nuevo y pulsa **Renombrar**. El diálogo *Guardar como…* solo edita la lista de etiquetas del prompt nuevo.
 - Cada cambio emite `promptlib:changed`, así que la pestaña del gestor refresca su lista, y también su editor salvo que tenga cambios sin guardar. Reference Library y otras páginas abiertas también se refrescan.
 
 **Gestor (pestaña Prompt Library, o el botón Gestionar)**
@@ -64,7 +66,7 @@ Si tienes [Reference Library](https://github.com/sweetyshots123/wan2gp-reference
 
 Los vínculos solo viven en `library.json` de Prompt Library (`collections: [id de colección, …]` por prompt; esquema 2). Los archivos antiguos de 1.0.x se migran solos.
 
-**Python:** `sys.modules["wan2gp_prompt_library_api"]`, `API_VERSION = 1`: `list_prompts()`, `prompts_for_collection(cid)`, `set_collection_prompts(cid, prompt_ids)`, `collections_for_prompt(pid)`, `set_prompt_collections(pid, cids)`, `get_prompt(pid)` y `revision()`. Todas las escrituras son seguras entre hilos y se guardan de forma atómica. Consulta la tabla del README en inglés.
+**Python:** `sys.modules["wan2gp_prompt_library_api"]`, `API_VERSION = 1`: `list_prompts()`, `prompts_for_collection(cid)`, `set_collection_prompts(cid, prompt_ids)`, `collections_for_prompt(pid)`, `set_prompt_collections(pid, cids)`, `get_prompt(pid)`, `revision()` y, desde 1.2.1, `rename_tag(old, new)`. Todas las escrituras son seguras entre hilos y se guardan de forma atómica. Consulta la tabla del README en inglés.
 
 **Eventos JS:**
 

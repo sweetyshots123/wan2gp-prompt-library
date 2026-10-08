@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.2.1 — 2026-10-09
+
+- **Rename a tag everywhere.** Editing a tag renames that tag itself on every prompt; it does not create a new one.
+  - **In the bar:** double-click a tag chip, or click the small pencil that appears on hover. The chip becomes a text field: Enter or blur saves, Esc cancels.
+    - The toast reads *Tag “neon” renamed to “neón” in N prompts*, or says *merged into* when the name already existed.
+    - It has **Undo**, which restores the exact previous tags on every affected prompt.
+  - **In the manager:** a new **Tags** section with a dropdown of the existing tags and their counts, a new-name field and **Rename**.
+  - **Matching:** case- and accent-insensitive, like the rest of the tag handling. If a prompt already has the new name, the two merge without a duplicate. An empty name, or one containing `,` or `;`, is rejected.
+  - **Saving:** one atomic, thread-safe save with a single revision bump (reason `tags`). `promptlib:changed` fires, so the manager, Reference Library and other pages refresh.
+- **The search box shows the loaded prompt and renames it.** Like Reference Library's collection select, the idle box shows the loaded prompt's title as its value.
+  - Focusing selects the title, so typing searches as usual; Esc or blur without a pick restores the title.
+  - Rename with the pencil inside the box (next to the clear ×) or by double-clicking the box. The box gets an amber frame and the placeholder *Rename prompt…*, and the dropdown is suppressed.
+  - Enter saves, Esc cancels, and an empty title is rejected.
+  - Same prompt id; text, tags and collections are untouched.
+  - The toast *Prompt renamed to “Y”* has **Undo**, which restores only the title.
+  - Long titles get an ellipsis in the status.
+  - The refresh goes through `promptlib:changed`, so the status, autocomplete, manager and Reference Library's chips update. New bridge action: `rename_prompt`.
+- **Fix:** adding a second tag/collection chip right after another could drop the first one. A background refresh rebuilt the chips from a library snapshot older than the in-flight save. The *modified* indicator now also updates as you type in WanGP's prompt.
+- Storage: `rename_tag`, `restore_tags` and `tag_counts`. Python API: `rename_tag(old, new)` → `{old, new, count, merged}`, which raises `ValueError` on bad names.
+
 ## 1.2.0 — 2026-10-08
 
 - **New bar under WanGP's prompt, in the same style as Reference Library's bar.** It is still a separate block.
