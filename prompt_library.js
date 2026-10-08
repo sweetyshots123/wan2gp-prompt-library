@@ -12,8 +12,6 @@
     const I18N = {
         en: {
             search_ph: "Search prompts…",
-            save_current: "Save current",
-            save_title_ph: "Title for the new prompt",
             no_results: "No matching prompts",
             insert: "Insert",
             undo: "Undo",
@@ -28,7 +26,6 @@
             open_tab: "Open Prompt Library tab",
             manage: "Manage",
             clear: "Clear",
-            save_current_title: "Save the current prompt to the library",
             keys_hint: "↑↓ to move · Enter to insert · Esc to close",
             collections: "Collections",
             coll_linked: "Linked collection: {names}",
@@ -37,11 +34,30 @@
             coll_prompts: "Prompts linked to «{name}»:",
             use_prompt: "Use «{title}»",
             prompt_missing: "Prompt not found in the library",
+            save: "Save",
+            save_as: "Save as…",
+            save_title: "Overwrite “{title}” with the current prompt text",
+            save_none_title: "No prompt loaded: save the current text as a new prompt",
+            save_as_title: "Save the current text as a new prompt (the loaded one stays unchanged)",
+            save_as_head: "Save as new prompt",
+            title_label: "Title",
+            text_label: "Text (WanGP's current prompt)",
+            copy_title: "{title} (copy)",
+            st_none: "No prompt loaded",
+            st_loaded: "Prompt “{title}” loaded",
+            st_modified: "modified",
+            st_modified_title: "WanGP's prompt differs from the saved text: Save to update it",
+            no_changes: "“{title}” has no changes to save",
+            tpl_confirm: "“{title}” is a template with {vars}; the current text has none of them. Overwrite it anyway?",
+            overwrite: "Overwrite",
+            cancel: "Cancel",
+            add_tag: "+ tag",
+            add_coll: "+ collection",
+            remove: "Remove",
+            no_suggestions: "No more collections",
         },
         es: {
             search_ph: "Buscar prompts…",
-            save_current: "Guardar actual",
-            save_title_ph: "Título del prompt nuevo",
             no_results: "Ningún prompt coincide",
             insert: "Insertar",
             undo: "Deshacer",
@@ -56,7 +72,6 @@
             open_tab: "Abrir pestaña Prompt Library",
             manage: "Gestionar",
             clear: "Borrar",
-            save_current_title: "Guardar el prompt actual en la librería",
             keys_hint: "↑↓ para moverte · Enter para insertar · Esc para cerrar",
             collections: "Colecciones",
             coll_linked: "Colección asociada: {names}",
@@ -65,6 +80,27 @@
             coll_prompts: "Prompts asociados a «{name}»:",
             use_prompt: "Usar «{title}»",
             prompt_missing: "No se encontró el prompt en la librería",
+            save: "Guardar",
+            save_as: "Guardar como…",
+            save_title: "Sobrescribir «{title}» con el texto actual del prompt",
+            save_none_title: "No hay ningún prompt cargado: guardar el texto actual como prompt nuevo",
+            save_as_title: "Guardar el texto actual como prompt nuevo (el cargado no cambia)",
+            save_as_head: "Guardar como prompt nuevo",
+            title_label: "Título",
+            text_label: "Texto (prompt actual de WanGP)",
+            copy_title: "{title} (copia)",
+            st_none: "Ningún prompt cargado",
+            st_loaded: "Prompt «{title}» cargado",
+            st_modified: "modificado",
+            st_modified_title: "El prompt de WanGP es distinto del texto guardado: pulsa Guardar para actualizarlo",
+            no_changes: "«{title}» no tiene cambios que guardar",
+            tpl_confirm: "«{title}» es una plantilla con {vars}; el texto actual no tiene ninguna. ¿Sobrescribir igualmente?",
+            overwrite: "Sobrescribir",
+            cancel: "Cancelar",
+            add_tag: "+ etiqueta",
+            add_coll: "+ colección",
+            remove: "Quitar",
+            no_suggestions: "No hay más colecciones",
         },
     };
     const browserLang = () => String(navigator.language || (navigator.languages && navigator.languages[0]) || "");
@@ -83,13 +119,88 @@
     const style = document.createElement("style");
     style.id = "plib-style";
     style.textContent = `
-/* ---- search bar (real Gradio Group / Textbox / Buttons, only small layout touches here) */
-.plib-bar { margin: 6px 0 4px !important; overflow: visible !important; }
+/* ---- bar under WanGP's prompt: same family as Reference Library's bar (header + status, control row, buttons with
+   icons, 36px controls), own .plib-* classes. WanGP studio variables with Gradio fallbacks (dark + light). */
+.plib-panel { --plib-h: 36px; --plib-surface: var(--studio-surface, var(--block-background-fill)); --plib-input: var(--studio-input, var(--input-background-fill));
+  --plib-bd: var(--studio-border, var(--block-border-color)); --plib-acc: var(--studio-accent, var(--color-accent)); --plib-label: var(--studio-label, var(--body-text-color));
+  container: plib-panel / inline-size; gap: 6px !important; padding: 7px 8px 8px !important; margin: 4px 0 2px !important;
+  background: var(--plib-surface) !important; border: 0 !important; border-radius: 7px !important; box-shadow: none !important; min-width: 0 !important; overflow: visible !important; }
 .plib-bar[data-disabled="1"], .plib-wrap[data-disabled="1"] { display: none !important; }
-.plib-bar .plib-bar-row { gap: 6px !important; align-items: center !important; flex-wrap: nowrap !important; padding: 4px !important;
-  background: var(--block-background-fill) !important; }
-.plib-bar .plib-save-btn, .plib-bar .plib-manage-btn { align-self: center !important; white-space: nowrap !important; flex: 0 0 auto !important;
-  min-height: 34px; }
+.plib-panel .row { gap: 6px !important; margin: 0 !important; padding: 0 !important; background: transparent !important; }
+.plib-panel .form { border: 0 !important; background: transparent !important; box-shadow: none !important; min-width: 0 !important; gap: 0 !important; }
+.plib-panel .plib-bar-head { flex-wrap: nowrap !important; align-items: center !important; min-height: 0 !important; gap: 10px !important; padding: 0 2px !important; }
+.plib-panel :is(.plib-bar-titlebox, .plib-bar-status, .plib-bar-meta) { min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: 0 !important; background: transparent !important; }
+.plib-panel .plib-bar-titlebox { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; }
+.plib-panel .plib-bar-status { flex: 1 1 0 !important; width: auto !important; min-width: 0 !important; overflow: hidden; }
+.plib-panel :is(.plib-bar-titlebox, .plib-bar-status, .plib-bar-meta) > * { min-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+.plib-bar-title { display: flex; align-items: center; gap: 6px; white-space: nowrap; line-height: 18px; font-size: var(--text-sm, 12px); font-weight: 600;
+  letter-spacing: .02em; color: var(--plib-label); opacity: .85; }
+.plib-bar-ico { display: inline-block; width: 14px; height: 14px; flex: 0 0 14px; background: var(--plib-acc);
+  -webkit-mask: var(--plib-icon-prompt) center / contain no-repeat; mask: var(--plib-icon-prompt) center / contain no-repeat; }
+.plib-bar-status-text { display: flex; justify-content: flex-end; align-items: center; gap: 6px; line-height: 18px; font-size: var(--text-sm, 12px);
+  color: var(--body-text-color-subdued); white-space: nowrap; overflow: hidden; min-width: 0; }
+.plib-bar-status-text .plib-st-main { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.plib-bar-status-text[data-kind="none"] { opacity: .75; }
+.plib-bar-status-text .plib-st-mod { flex: none; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: #b45309 !important; }
+.dark .plib-bar-status-text .plib-st-mod { color: #fbbf24 !important; }
+.plib-st-mod::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.plib-panel .plib-row { flex-wrap: wrap !important; align-items: stretch !important; }
+.plib-panel .plib-ctl { flex: 1000 1 170px !important; min-width: 150px !important; }
+.plib-panel .plib-btns { flex: 1 0 auto !important; width: auto !important; min-width: 0 !important; flex-wrap: nowrap !important; align-items: stretch !important; gap: 6px !important; }
+.plib-panel .plib-btn { flex: 1 0 auto !important; width: auto !important; min-width: 0 !important; display: inline-flex !important; align-items: center !important;
+  justify-content: center !important; gap: 6px !important; height: var(--plib-h) !important; min-height: var(--plib-h) !important; padding: 0 11px !important;
+  white-space: nowrap !important; overflow: visible !important; text-overflow: clip !important; font-size: var(--text-md, 14px) !important;
+  font-weight: 400 !important; line-height: 1 !important; border-radius: 6px !important; }
+.plib-panel .plib-btn[class*="plib-ico-"]::before { content: "" !important; display: block !important; flex: 0 0 14px !important; width: 14px !important; height: 14px !important;
+  margin: 0 !important; position: static !important; background: currentColor !important; pointer-events: none;
+  -webkit-mask: var(--plib-icon) center / contain no-repeat !important; mask: var(--plib-icon) center / contain no-repeat !important; }
+.plib-panel .plib-btn.plib-hide, .plib-fallback .plib-btn.plib-hide { display: none !important; }
+.plib-ico-save { --plib-icon: var(--plib-icon-save); } .plib-ico-saveas { --plib-icon: var(--plib-icon-saveas); } .plib-ico-manage { --plib-icon: var(--plib-icon-manage); }
+/* Save highlights (primary look) while WanGP's prompt differs from the loaded prompt */
+.plib-panel .plib-btn.plib-attn { font-weight: 600 !important; background: var(--button-primary-background-fill) !important; color: var(--button-primary-text-color) !important;
+  border-color: var(--button-primary-border-color, transparent) !important; }
+.plib-panel .plib-btn.plib-attn:hover { background: var(--button-primary-background-fill-hover, var(--button-primary-background-fill)) !important; }
+.plib-panel .plib-ctl:is(.block) :is(input, textarea) { min-height: var(--plib-h) !important; height: var(--plib-h) !important; box-sizing: border-box !important; border-radius: 5px !important;
+  background: var(--plib-input) !important; box-shadow: inset 0 0 0 1px var(--plib-bd) !important; border: 0 !important; resize: none !important;
+  font-size: var(--text-md, 14px) !important; line-height: 20px !important; padding-top: 8px !important; padding-bottom: 6px !important; overflow: hidden !important; }
+.plib-panel .plib-ctl:is(.block) :is(input, textarea):focus { box-shadow: inset 0 0 0 1px var(--plib-acc), 0 0 0 1px var(--plib-acc) !important; }
+.plib-panel .plib-ctl label { margin: 0 !important; }
+@container plib-panel (max-width: 430px) {
+  .plib-panel .plib-row > .plib-btns { flex-wrap: wrap !important; flex-basis: 100% !important; margin-left: 0 !important; }
+  .plib-panel .plib-row > .plib-btns > .plib-btn { flex: 1 1 calc(33% - 4px) !important; }
+}
+/* current prompt details: tags + Reference Library collections (inline chip editors, saved immediately) */
+.plib-panel .plib-bar-meta:not(:has(.plib-meta)) { display: none !important; }
+.plib-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 2px 2px 0; min-width: 0; }
+.plib-meta-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.plib-meta-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm, 12px); font-weight: 600; color: var(--plib-label); opacity: .85; white-space: nowrap; }
+.plib-meta-label::before { content: ""; width: 14px; height: 14px; flex: 0 0 14px; background: var(--plib-acc);
+  -webkit-mask: var(--plib-lab-icon) center / contain no-repeat; mask: var(--plib-lab-icon) center / contain no-repeat; }
+.plib-meta-label[data-kind="tags"] { --plib-lab-icon: var(--plib-icon-tag); } .plib-meta-label[data-kind="coll"] { --plib-lab-icon: var(--plib-icon-images); }
+/* chip editor (bar details row and the Save as dialog share it) */
+.plib-cedit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.plib-echip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 11px; border-radius: 13px; max-width: 100%; min-width: 0;
+  font-size: var(--text-sm, 12px); line-height: 1; color: var(--studio-button-text, var(--button-secondary-text-color, var(--plib-fg)));
+  background: var(--studio-button, var(--button-secondary-background-fill, var(--plib-chip-bg))); box-shadow: inset 0 0 0 1px var(--plib-bd, var(--plib-border)); }
+.plib-echip.plib-echip-coll { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--plib-accent)); font-weight: 600; }
+.plib-echip.plib-echip-coll::before { content: ""; width: 11px; height: 11px; flex: none; margin-right: 1px; background: currentColor; opacity: .85;
+  -webkit-mask: var(--plib-icon-images) center / contain no-repeat; mask: var(--plib-icon-images) center / contain no-repeat; }
+.plib-echip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.plib-echip-x { all: unset; cursor: pointer; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; opacity: .7; flex: none; }
+.plib-echip-x:hover, .plib-echip-x:focus-visible { opacity: 1; background: rgba(127,127,127,.25); }
+.plib-echip-x svg { width: 9px; height: 9px; }
+input.plib-echip-add { all: unset; box-sizing: border-box; height: 26px; width: 118px; padding: 0 10px; border-radius: 13px; font-size: var(--text-sm, 12px);
+  color: var(--body-text-color, var(--plib-fg)); background: transparent; box-shadow: inset 0 0 0 1px var(--plib-bd, var(--plib-border)); border: 0; }
+input.plib-echip-add::placeholder { color: var(--body-text-color-subdued, var(--plib-subdued)); opacity: 1; }
+input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--plib-accent)), 0 0 0 1px var(--plib-acc, var(--plib-accent)); }
+.plib-sugg { position: fixed; z-index: 10100; display: none; min-width: 160px; max-width: 320px; max-height: 220px; overflow-y: auto; padding: 4px; box-sizing: border-box;
+  border-radius: 8px; background: var(--plib-bg); color: var(--plib-fg); border: 1px solid var(--plib-border); box-shadow: 0 10px 28px rgba(0,0,0,.35);
+  font-family: var(--plib-font, inherit); font-size: 13px; }
+.plib-sugg.open { display: block; }
+.plib-sugg-item { padding: 6px 9px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; white-space: nowrap; }
+.plib-sugg-item.active, .plib-sugg-item:hover { background: var(--plib-active); }
+.plib-sugg-item small { color: var(--plib-subdued); }
+.plib-sugg-empty { padding: 6px 9px; color: var(--plib-subdued); }
 .plib-search-box { position: relative !important; min-width: 0 !important; }
 .plib-search-box input, .plib-search-box textarea { padding-left: 30px !important; padding-right: 30px !important; min-height: 34px; box-sizing: border-box; }
 .plib-search-box input::placeholder, .plib-search-box textarea::placeholder { color: var(--input-placeholder-color) !important; opacity: 1 !important; }
@@ -102,10 +213,17 @@
 .plib-clear.show { display: flex; }
 .plib-clear svg { width: 10px; height: 10px; }
 :root { --plib-icon-images: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='5' width='18' height='14' rx='2' fill='none' stroke='black' stroke-width='2.4'/%3E%3Cpath d='M5 17l5-5 4 4 2-2 3 3' fill='none' stroke='black' stroke-width='2.2' stroke-linejoin='round'/%3E%3Ccircle cx='15.5' cy='9.5' r='1.6' fill='black'/%3E%3C/svg%3E"); }
+:root { --plib-icon-prompt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5h16v11H9l-5 4V5Z'/%3E%3Cpath d='M8 9h8M8 12h5'/%3E%3C/svg%3E");
+  --plib-icon-save: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3h12l4 4v14H3V3h2Zm2 0v7h10V3M7 21v-7h10v7'/%3E%3C/svg%3E");
+  --plib-icon-saveas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 21H3V3h12l4 4v5M7 3v6h8V3M7 21v-6h5M18 15v6M15 18h6'/%3E%3C/svg%3E");
+  --plib-icon-manage: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1'/%3E%3Ccircle cx='15' cy='6' r='2'/%3E%3Ccircle cx='9' cy='12' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E");
+  --plib-icon-tag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12V3h9l9 9-9 9-9-9Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5' fill='black'/%3E%3C/svg%3E"); }
 :root { --plib-icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5' fill='none' stroke='black' stroke-width='2.4'/%3E%3Cpath d='M15.5 15.5L21 21' stroke='black' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
 /* ---- DOM-only fallback bar (only used if the Gradio bar could not be inserted) */
 .plib-wrap.plib-fallback { display: flex; gap: 6px; align-items: center; margin: 6px 0; padding: 4px; border-radius: var(--block-radius);
   background: var(--block-background-fill); border: 1px solid var(--block-border-color); }
+.plib-fallback { flex-direction: column; align-items: stretch !important; }
+.plib-fallback .plib-fb-row { display: flex; gap: 6px; align-items: center; }
 .plib-fallback .plib-search-box { flex: 1 1 auto; }
 .plib-fallback input { width: 100%; height: 34px; border-radius: var(--input-radius); border: 1px solid var(--input-border-color);
   background: var(--input-background-fill); color: var(--body-text-color); font: inherit; font-size: var(--input-text-size); outline: none; }
@@ -162,6 +280,16 @@
 .plib-modal input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: var(--plib-input-radius, 6px); border: 1px solid var(--plib-border);
   background: var(--plib-input-bg); color: var(--plib-fg); font: inherit; font-size: 13px; outline: none; }
 .plib-modal input:focus { border-color: var(--plib-accent); }
+.plib-modal.plib-saveas { width: min(92vw, 520px); }
+.plib-modal .plib-cedit { padding: 6px; border-radius: var(--plib-input-radius, 6px); border: 1px solid var(--plib-border); background: var(--plib-input-bg);
+  --plib-bd: var(--plib-border); --plib-acc: var(--plib-accent); }
+.plib-modal .plib-echip { color: var(--plib-fg); background: var(--plib-chip-bg); }
+.plib-modal input.plib-echip-add { width: 130px; height: 26px; padding: 0 10px; border: 0; border-radius: 13px; color: var(--plib-fg); background: transparent;
+  box-shadow: inset 0 0 0 1px var(--plib-border); }
+.plib-modal input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-accent), 0 0 0 1px var(--plib-accent); }
+.plib-saveas-text { max-height: 96px; overflow: auto; padding: 8px 10px; border-radius: var(--plib-input-radius, 6px); border: 1px dashed var(--plib-border);
+  font-size: 12px; line-height: 1.45; color: var(--plib-subdued); white-space: pre-wrap; word-break: break-word; }
+.plib-modal-text { margin: 0; font-size: 13px; line-height: 1.5; color: var(--plib-fg); }
 .plib-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .plib-modal-actions button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: var(--plib-btn-radius, 6px); font-size: 13px; font-weight: 600;
   background: var(--plib-primary-bg); color: var(--plib-primary-fg); }
@@ -385,8 +513,17 @@
             if (data.undo_id && cfg.undo !== false) {
                 buttons.push({
                     label: t("undo"),
-                    onClick: () => sendBridge({ action: "undo", tab: data.tab || activeTab(), undo_id: data.undo_id }).catch(() => {}),
+                    onClick: () => sendBridge({ action: "undo", tab: data.tab || activeTab(), undo_id: data.undo_id }).then((r) => {
+                        // Undoing an insert also gives back the previously loaded prompt of the bar.
+                        const ctx = insertUndo.get(data.undo_id);
+                        if (r && r.ok && ctx) { insertUndo.delete(data.undo_id); setCurrent(ctx.tab, ctx.prev); }
+                    }).catch(() => {}),
                 });
+            }
+            if (data.save_undo_id) {
+                buttons.push({ label: t("undo"), onClick: () => undoSave(data.save_undo_id) });
+                toast(data.toast, "ok", buttons, { minMs: 6000 });
+                return;
             }
             const linked = offer ? collectionAction(offer) : null;
             if (linked && linked.buttons.length) {
@@ -437,7 +574,10 @@
                 req_id: reqId, action: "insert", tab, field: fieldOf(visiblePromptRoot(tab)), id: item.id, mode,
                 cursor: mode === "cursor" ? cursorOf(tab) : null, current: readPromptValue(tab), vars: vars || undefined,
             });
-            if (r && r.ok) window.dispatchEvent(new CustomEvent("promptlib:applied", { detail: { id: item.id, title: item.title, source: opts.source || null } }));
+            if (r && r.ok) {
+                loadedFrom(tab, item, r);
+                window.dispatchEvent(new CustomEvent("promptlib:applied", { detail: { id: item.id, title: item.title, source: opts.source || null } }));
+            }
             return !!(r && r.ok);
         } catch (e) {
             offers.delete(reqId);
@@ -462,6 +602,7 @@
             { force: true, minMs: 9000 });
     });
     let reflibTimer = null;
+    // Any reason (create / rename / delete / images / restore / duplicate / future ones): just re-fetch names.
     window.addEventListener("reflib:changed", () => {
         clearTimeout(reflibTimer);
         reflibTimer = setTimeout(() => { const b = document.getElementById("plib_reflib_refresh"); if (b) b.click(); }, 250);
@@ -560,8 +701,9 @@
         const stack = root.closest(".wangp-prompt-tools-stack") || root.parentElement || root;
         const wrap = document.createElement("div");
         wrap.className = "plib-wrap plib-fallback";
-        wrap.innerHTML = `<div class="plib-search-box"><input type="text" autocomplete="off" spellcheck="false" /></div>
-          <button type="button" class="plib-btn plib-save-btn"></button><button type="button" class="plib-btn plib-manage-btn"></button>`;
+        wrap.innerHTML = `<div class="plib-fb-row"><div class="plib-search-box"><input type="text" autocomplete="off" spellcheck="false" /></div>
+          <button type="button" class="plib-btn plib-save-btn"></button><button type="button" class="plib-btn plib-saveas-btn"></button>
+          <button type="button" class="plib-btn plib-manage-btn"></button></div><div class="plib-fb-status"></div><div class="plib-fb-meta"></div>`;
         stack.parentElement.insertBefore(wrap, stack.nextSibling);
         return wrap;
     }
@@ -594,13 +736,14 @@
             box.appendChild(clearBtn);
         }
         const saveBtn = wrap.querySelector(".plib-save-btn");
+        const saveAsBtn = wrap.querySelector(".plib-saveas-btn");
         const manageBtn = wrap.querySelector(".plib-manage-btn");
         const dd = document.createElement("div");
         dd.className = "plib-dd";
         dd.dataset.tab = tab;
         dd.setAttribute("role", "listbox");
         document.body.appendChild(dd);
-        const state = { wrap, input, dd, saveBtn, manageBtn, clearBtn, activeIdx: -1, results: [] };
+        const state = { tab, wrap, input, dd, saveBtn, saveAsBtn, manageBtn, clearBtn, activeIdx: -1, results: [] };
         mounts.set(tab, state);
         relabel(state);
         const syncClear = () => clearBtn.classList.toggle("show", !!input.value);
@@ -613,10 +756,12 @@
         }, 180));
         clearBtn.addEventListener("mousedown", (e) => e.preventDefault());
         clearBtn.addEventListener("click", () => { setInputValue(input, ""); syncClear(); input.focus(); renderDropdown(state); });
-        if (saveBtn) saveBtn.addEventListener("click", () => onSaveCurrent(tab));
+        if (saveBtn) saveBtn.addEventListener("click", () => onSave(tab));
+        if (saveAsBtn) saveAsBtn.addEventListener("click", () => onSaveAs(tab));
         if (manageBtn) manageBtn.addEventListener("click", openManageTab);
         dd.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the input
         syncClear();
+        updateBar(tab, true);
         return state;
     }
     // One set of global listeners for all mounts (Esc in capture phase, outside click, reposition on scroll/resize).
@@ -652,8 +797,11 @@
     function relabel(state) {
         if (!state) return;
         state.input.placeholder = t("search_ph");
-        if (state.saveBtn) { state.saveBtn.textContent = t("save_current"); state.saveBtn.title = t("save_current_title");
-            state.saveBtn.style.display = cfg.save_current_button === false ? "none" : ""; }
+        const hideSave = cfg.save_current_button === false;
+        if (state.saveBtn) { state.saveBtn.textContent = t("save"); state.saveBtn.classList.toggle("plib-hide", hideSave); }
+        if (state.saveAsBtn) { state.saveAsBtn.textContent = t("save_as"); state.saveAsBtn.title = t("save_as_title"); state.saveAsBtn.classList.toggle("plib-hide", hideSave); }
+        state.statusHtml = null; state.metaSig = null;
+        updateBar(state.tab, true);
         if (state.manageBtn) { state.manageBtn.textContent = t("manage"); state.manageBtn.title = t("open_tab"); }
         state.clearBtn && (state.clearBtn.title = t("clear"));
     }
@@ -755,7 +903,7 @@
         const reqId = Math.random().toString(16).slice(2);
         offers.set(reqId, item);
         try {
-            await sendBridge({
+            const r = await sendBridge({
                 req_id: reqId,
                 action: "insert",
                 tab,
@@ -766,6 +914,7 @@
                 current: readPromptValue(tab),
                 vars: vars || undefined,
             });
+            if (r && r.ok) loadedFrom(tab, item, r);
         } catch (e) {
             offers.delete(reqId);
             toast(String(e.message || e), "error");
@@ -817,57 +966,363 @@
             });
         });
     }
-    async function onSaveCurrent(tab) {
+    // ------------------------------------------------------------------ current prompt (per tab, per browser session)
+    // The bar remembers which library prompt is loaded in WanGP's prompt (picked from the autocomplete or applied
+    // through promptlib:apply), shows it in its header and compares WanGP's text with the saved one ("modified").
+    const current = new Map();       // tab -> { id, rendered }  (rendered: text with template values applied, else null)
+    const insertUndo = new Map();    // insert undo_id -> { tab, prev }
+    const saveUndoCtx = new Map();   // save undo id -> { tab, prev }
+    const SS_KEY = (tab) => "plib.current." + tab;
+    function getCurrent(tab) {
+        if (!current.has(tab)) {
+            let v = null;
+            try { v = JSON.parse(sessionStorage.getItem(SS_KEY(tab)) || "null"); } catch (_) { v = null; }
+            current.set(tab, v && typeof v.id === "string" ? { id: v.id, rendered: typeof v.rendered === "string" ? v.rendered : null } : null);
+        }
+        return current.get(tab);
+    }
+    function setCurrent(tab, cur) {
+        cur = cur && cur.id ? { id: String(cur.id), rendered: typeof cur.rendered === "string" ? cur.rendered : null } : null;
+        current.set(tab, cur);
+        try { cur ? sessionStorage.setItem(SS_KEY(tab), JSON.stringify(cur)) : sessionStorage.removeItem(SS_KEY(tab)); } catch (_) {}
+        updateBar(tab, true);
+        setTimeout(() => updateBar(tab), 350); // Gradio may apply the new prompt value a moment later
+    }
+    function loadedFrom(tab, item, r) {
+        const prev = getCurrent(tab);
+        if (r.undo_id) insertUndo.set(r.undo_id, { tab, prev });
+        setCurrent(tab, { id: item.id, rendered: item.vars && item.vars.length && typeof r.text === "string" ? r.text : null });
+    }
+    function currentItem(tab) {
+        const c = getCurrent(tab);
+        return c ? library.find(p => p.id === c.id) || null : null;
+    }
+    const normText = (v) => String(v == null ? "" : v).replace(/\r\n/g, "\n").replace(/\s+$/, "");
+    function isModified(tab) {
+        const c = getCurrent(tab), item = currentItem(tab);
+        if (!item) return false;
+        return normText(readPromptValue(tab)) !== normText(c.rendered != null ? c.rendered : item.text);
+    }
+    function statusEl(state) {
+        const el = document.getElementById("plib_bar_status_" + state.tab) || state.wrap.querySelector(".plib-fb-status");
+        return el ? (el.querySelector(".prose") || el) : null;
+    }
+    function metaEl(state) {
+        const el = document.getElementById("plib_bar_meta_" + state.tab) || state.wrap.querySelector(".plib-fb-meta");
+        return el ? (el.querySelector(".prose") || el) : null;
+    }
+    function updateBar(tab, force) {
+        const state = mounts.get(tab);
+        if (!state || !state.wrap.isConnected) return;
+        const item = currentItem(tab);
+        const modified = !!item && isModified(tab);
+        // header status
+        const st = statusEl(state);
+        if (st) {
+            let html;
+            if (!item) html = `<div class="plib-bar-status-text" data-kind="none"><span class="plib-st-main">${escapeHtml(t("st_none"))}</span></div>`;
+            else {
+                const main = t("st_loaded", { title: item.title });
+                html = `<div class="plib-bar-status-text" data-kind="${modified ? "modified" : "ok"}" title="${escapeHtml(main)}">`
+                    + `<span class="plib-st-main">${escapeHtml(main)}</span>`
+                    + (modified ? `<span class="plib-st-mod" title="${escapeHtml(t("st_modified_title"))}">${escapeHtml(t("st_modified"))}</span>` : "")
+                    + `</div>`;
+            }
+            if (force || state.statusHtml !== html || st.innerHTML !== html) { st.innerHTML = html; state.statusHtml = html; }
+        }
+        state.wrap.dataset.current = item ? item.id : "";
+        state.wrap.dataset.modified = modified ? "1" : "0";
+        if (state.saveBtn) {
+            state.saveBtn.classList.toggle("plib-attn", modified);
+            state.saveBtn.title = item ? t("save_title", { title: item.title }) : t("save_none_title");
+        }
+        renderMeta(state, item, force);
+    }
+    function updateAllBars() { for (const tab of mounts.keys()) updateBar(tab); }
+    document.addEventListener("input", (e) => {
+        const el = e.target;
+        if (el && el.closest && el.closest("#wangp-prompt-advanced, #wangp-prompt-wizard")) {
+            clearTimeout(updateAllBars._t);
+            updateAllBars._t = setTimeout(updateAllBars, 120);
+        }
+    }, true);
+
+    // ---- details row: tags + collections of the current prompt, edited inline and saved immediately (with Undo)
+    function visibleLinks(item) { return linkedCollections(item).map(c => c.id); }
+    function metaSig(item) {
+        return item ? JSON.stringify([item.id, item.tags || [], collections ? visibleLinks(item) : null, lang()]) : "";
+    }
+    function renderMeta(state, item, force) {
+        const box = metaEl(state);
+        if (!box) return;
+        const sig = metaSig(item);
+        if (!force && sig === state.metaSig && box.isConnected && (sig === "" || box.querySelector(".plib-meta"))) return;
+        state.metaSig = sig;
+        const focused = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.kind : null;
+        (state.editors || []).forEach(ed => ed.destroy());
+        state.editors = [];
+        box.innerHTML = "";
+        if (!item) return;
+        const row = document.createElement("div");
+        row.className = "plib-meta";
+        const group = (kind, label, editor) => {
+            const g = document.createElement("div");
+            g.className = "plib-meta-group";
+            g.dataset.kind = kind;
+            const l = document.createElement("span");
+            l.className = "plib-meta-label";
+            l.dataset.kind = kind;
+            l.textContent = label;
+            g.append(l, editor.el);
+            row.appendChild(g);
+            state.editors.push(editor);
+        };
+        const id = item.id;
+        group("tags", t("tags"), chipEditor({
+            kind: "tags", values: item.tags || [], placeholder: t("add_tag"), allowFree: true, suggest: tagSuggestions,
+            onChange: (vals) => { state.metaSig = metaSig(Object.assign({}, item, { tags: vals })); saveMeta(state.tab, id, { tags: vals }); },
+        }));
+        if (collections) {
+            group("coll", t("collections"), chipEditor({
+                kind: "coll", values: visibleLinks(item), placeholder: t("add_coll"), allowFree: false, suggest: collSuggestions,
+                labelOf: (v) => (collById.get(v) || {}).name || v, emptyText: t("no_suggestions"),
+                onChange: (vals) => {
+                    state.metaSig = metaSig(Object.assign({}, item, { collections: vals.concat((item.collections || []).filter(c => !collById.has(c))) }));
+                    saveMeta(state.tab, id, { collections: vals });
+                },
+            }));
+        }
+        box.appendChild(row);
+        if (focused) { const inp = box.querySelector(`input.plib-echip-add[data-kind="${focused}"]`); if (inp) inp.focus(); }
+    }
+    async function saveMeta(tab, id, fields) {
+        try { await sendBridge(Object.assign({ action: "set_meta", tab, id }, fields)); }
+        catch (e) { toast(String(e.message || e), "error"); }
+        updateBar(tab, true);
+    }
+    function tagSuggestions(query, have) {
+        const counts = new Map();
+        for (const p of library) for (const tag of p.tags || []) {
+            const k = fold(tag);
+            const e = counts.get(k) || { value: tag, n: 0 };
+            e.n++; counts.set(k, e);
+        }
+        const q = fold(query).trim(), haveF = new Set(have.map(fold));
+        return [...counts.entries()].filter(([k]) => !haveF.has(k) && (!q || k.includes(q)))
+            .sort((a, b) => (q ? (b[0].startsWith(q) - a[0].startsWith(q)) : 0) || b[1].n - a[1].n || a[0].localeCompare(b[0]))
+            .slice(0, 8).map(([, e]) => ({ value: e.value, label: e.value, hint: String(e.n) }));
+    }
+    function collSuggestions(query, have) {
+        const q = fold(query).trim();
+        return (collections || []).filter(c => !have.includes(c.id) && (!q || fold(c.name).includes(q)))
+            .slice(0, 12).map(c => ({ value: c.id, label: c.name, hint: c.count != null ? String(c.count) : "" }));
+    }
+    function chipEditor(opts) {
+        // values: strings; suggest(query, values) -> [{value, label, hint}]; allowFree: typed text becomes a value.
+        const root = document.createElement("div");
+        root.className = "plib-cedit";
+        root.dataset.kind = opts.kind;
+        let vals = [...(opts.values || [])];
+        const labelOf = opts.labelOf || ((v) => v);
+        const input = document.createElement("input");
+        input.className = "plib-echip-add";
+        input.dataset.kind = opts.kind;
+        input.placeholder = opts.placeholder || "";
+        input.setAttribute("autocomplete", "off");
+        input.setAttribute("spellcheck", "false");
+        root.appendChild(input);
+        const pop = document.createElement("div");
+        pop.className = "plib-sugg";
+        pop.dataset.kind = opts.kind;
+        let sugg = [], active = -1;
+        const emit = () => { if (opts.onChange) opts.onChange([...vals]); };
+        function render() {
+            root.querySelectorAll(".plib-echip").forEach(n => n.remove());
+            for (const v of vals) {
+                const chip = document.createElement("span");
+                chip.className = "plib-echip" + (opts.kind === "coll" ? " plib-echip-coll" : "");
+                chip.dataset.value = v;
+                const tx = document.createElement("span");
+                tx.className = "plib-echip-text";
+                tx.textContent = labelOf(v);
+                const x = document.createElement("button");
+                x.type = "button";
+                x.className = "plib-echip-x";
+                x.title = t("remove") + " " + labelOf(v);
+                x.setAttribute("aria-label", x.title);
+                x.innerHTML = X_SVG;
+                x.addEventListener("click", (e) => { e.preventDefault(); vals = vals.filter(o => o !== v); render(); emit(); });
+                chip.append(tx, x);
+                root.insertBefore(chip, input);
+            }
+        }
+        function add(v) {
+            v = String(v || "").trim();
+            if (!v || vals.some(o => fold(o) === fold(v))) { input.value = ""; return; }
+            vals.push(v); input.value = ""; render(); emit();
+            if (document.activeElement === input) show();
+        }
+        function show() {
+            sugg = opts.suggest ? opts.suggest(input.value, vals) : [];
+            active = opts.allowFree ? -1 : (sugg.length ? 0 : -1);
+            if (!sugg.length && !(opts.emptyText && !opts.allowFree)) { hide(); return; }
+            pop.innerHTML = sugg.length ? sugg.map((s2, i) => `<div class="plib-sugg-item${i === active ? " active" : ""}" data-i="${i}">`
+                + `<span>${escapeHtml(s2.label)}</span>${s2.hint ? `<small>${escapeHtml(s2.hint)}</small>` : ""}</div>`).join("")
+                : `<div class="plib-sugg-empty">${escapeHtml(opts.emptyText)}</div>`;
+            pop.querySelectorAll(".plib-sugg-item").forEach(el => el.addEventListener("mousedown", (e) => { e.preventDefault(); add(sugg[Number(el.dataset.i)].value); }));
+            if (!pop.isConnected) document.body.appendChild(pop);
+            applyTheme(pop);
+            const r = input.getBoundingClientRect();
+            pop.style.left = Math.max(8, Math.min(r.left, innerWidth - 330)) + "px";
+            pop.style.top = (r.bottom + 4) + "px";
+            pop.classList.add("open");
+        }
+        function hide() { pop.classList.remove("open"); active = -1; }
+        function mark() { pop.querySelectorAll(".plib-sugg-item").forEach((el, i) => el.classList.toggle("active", i === active)); }
+        input.addEventListener("focus", show);
+        input.addEventListener("input", show);
+        input.addEventListener("blur", () => setTimeout(hide, 120));
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowDown" && sugg.length) { e.preventDefault(); active = (active + 1) % sugg.length; mark(); }
+            else if (e.key === "ArrowUp" && sugg.length) { e.preventDefault(); active = (active - 1 + sugg.length) % sugg.length; mark(); }
+            else if (e.key === "Enter" || (e.key === "," && opts.allowFree)) {
+                e.preventDefault(); e.stopPropagation();
+                if (active >= 0 && sugg[active]) add(sugg[active].value);
+                else if (opts.allowFree) add(input.value.replace(/,/g, " "));
+            } else if (e.key === "Escape") { if (pop.classList.contains("open")) { e.stopPropagation(); hide(); } }
+        });
+        render();
+        return { el: root, get: () => [...vals], destroy: () => pop.remove() };
+    }
+
+    // ---- Save (overwrite the loaded prompt) / Save as… (new prompt, becomes the current one)
+    async function onSave(tab) {
+        const item = currentItem(tab);
+        if (!item) return onSaveAs(tab);
         const text = readPromptValue(tab);
         if (!String(text || "").trim()) { toast(t("empty_prompt"), "error"); return; }
-        const title = await askTitle(text.split("\n")[0].slice(0, 60));
-        if (title === null) return;
-        try {
-            await sendBridge({
-                action: "save_current",
-                tab,
-                field: fieldOf(visiblePromptRoot(tab)),
-                text,
-                title: title || text.split("\n")[0].slice(0, 60),
-            });
-        } catch (e) {
-            toast(String(e.message || e), "error");
+        if (!isModified(tab)) { toast(t("no_changes", { title: item.title }), "info"); return; }
+        if (item.vars && item.vars.length && !item.vars.some(v => text.includes("{" + v + "}"))) {
+            const ok = await askConfirm(t("tpl_confirm", { title: item.title, vars: item.vars.map(v => "{" + v + "}").join(", ") }), t("overwrite"));
+            if (!ok) return;
         }
+        try {
+            const r = await sendBridge({ action: "update_text", tab, id: item.id, field: fieldOf(visiblePromptRoot(tab)), text });
+            if (r && r.ok) setCurrent(tab, { id: item.id, rendered: null });
+        } catch (e) { toast(String(e.message || e), "error"); }
     }
-    function askTitle(defaultTitle) {
+    async function onSaveAs(tab) {
+        const text = readPromptValue(tab);
+        if (!String(text || "").trim()) { toast(t("empty_prompt"), "error"); return; }
+        const item = currentItem(tab);
+        const res = await askSaveAs({
+            title: item ? t("copy_title", { title: item.title }) : text.split("\n")[0].slice(0, 60),
+            tags: item ? item.tags || [] : [],
+            colls: item && collections ? visibleLinks(item) : [],
+            text,
+        });
+        if (!res) return;
+        try {
+            const prev = getCurrent(tab);
+            const r = await sendBridge({
+                action: "save_as", tab, field: fieldOf(visiblePromptRoot(tab)), text, title: res.title, tags: res.tags,
+                collections: collections ? res.colls : undefined, from_id: item ? item.id : null,
+            });
+            if (r && r.ok && r.item) {
+                if (r.save_undo_id) saveUndoCtx.set(r.save_undo_id, { tab, prev });
+                setCurrent(tab, { id: r.item.id, rendered: null });
+            }
+        } catch (e) { toast(String(e.message || e), "error"); }
+    }
+    async function undoSave(undoId) {
+        try {
+            const r = await sendBridge({ action: "undo_save", tab: activeTab(), undo_id: undoId });
+            const ctx = saveUndoCtx.get(undoId);
+            saveUndoCtx.delete(undoId);
+            // Undoing a "Save as" removes the new prompt: the previously loaded one becomes current again.
+            // (the library refresh may already have cleared the deleted prompt from the bar).
+            if (r && r.ok && r.undo_kind === "create" && ctx) {
+                const now = getCurrent(ctx.tab);
+                if (!now || now.id === r.undone_id) setCurrent(ctx.tab, ctx.prev);
+            }
+            updateAllBars();
+        } catch (e) { toast(String(e.message || e), "error"); }
+    }
+    function modalShell(cls) {
+        const bg = document.createElement("div");
+        bg.className = "plib-modal-bg";
+        const modal = document.createElement("div");
+        modal.className = "plib-modal " + (cls || "");
+        bg.appendChild(modal);
+        return { bg, modal };
+    }
+    function modalActions(modal, okLabel) {
+        const actions = document.createElement("div");
+        actions.className = "plib-modal-actions";
+        const cancel = document.createElement("button");
+        cancel.className = "plib-secondary plib-cancel";
+        cancel.textContent = t("cancel");
+        const ok = document.createElement("button");
+        ok.className = "plib-ok";
+        ok.textContent = okLabel;
+        actions.append(cancel, ok);
+        modal.appendChild(actions);
+        return { cancel, ok };
+    }
+    function askConfirm(text, okLabel) {
         return new Promise((resolve) => {
-            const bg = document.createElement("div");
-            bg.className = "plib-modal-bg";
-            const modal = document.createElement("div");
-            modal.className = "plib-modal";
-            modal.innerHTML = `<h3>${escapeHtml(t("save_current"))}</h3>
-              <label>${escapeHtml(t("save_title_ph"))}</label>`;
+            const { bg, modal } = modalShell("plib-confirm");
+            const p = document.createElement("p");
+            p.className = "plib-modal-text";
+            p.textContent = text;
+            modal.appendChild(p);
+            const { cancel, ok } = modalActions(modal, okLabel);
+            applyTheme(modal);
+            document.body.appendChild(bg);
+            ok.focus();
+            const done = (v) => { bg.remove(); resolve(v); };
+            cancel.addEventListener("click", () => done(false));
+            ok.addEventListener("click", () => done(true));
+            bg.addEventListener("click", (e) => { if (e.target === bg) done(false); });
+            modal.addEventListener("keydown", (e) => { if (e.key === "Escape") done(false); });
+        });
+    }
+    function askSaveAs(init) {
+        // Title + tags + collections (same chip editors as the bar's details row) + a read-only preview of the text.
+        return new Promise((resolve) => {
+            const { bg, modal } = modalShell("plib-saveas");
+            modal.innerHTML = `<h3>${escapeHtml(t("save_as_head"))}</h3><label>${escapeHtml(t("title_label"))}</label>`;
             const inp = document.createElement("input");
-            inp.value = defaultTitle || "";
+            inp.className = "plib-saveas-title";
+            inp.value = init.title || "";
             modal.appendChild(inp);
-            const actions = document.createElement("div");
-            actions.className = "plib-modal-actions";
-            const cancel = document.createElement("button");
-            cancel.className = "plib-secondary";
-            cancel.textContent = t("close");
-            const ok = document.createElement("button");
-            ok.textContent = t("save_current");
-            actions.appendChild(cancel);
-            actions.appendChild(ok);
-            modal.appendChild(actions);
-            bg.appendChild(modal);
+            const lab = (txt) => { const l = document.createElement("label"); l.textContent = txt; modal.appendChild(l); };
+            lab(t("tags"));
+            const tagsEd = chipEditor({ kind: "tags", values: init.tags, placeholder: t("add_tag"), allowFree: true, suggest: tagSuggestions });
+            modal.appendChild(tagsEd.el);
+            let collEd = null;
+            if (collections) {
+                lab(t("collections"));
+                collEd = chipEditor({ kind: "coll", values: init.colls, placeholder: t("add_coll"), allowFree: false, suggest: collSuggestions,
+                    labelOf: (v) => (collById.get(v) || {}).name || v, emptyText: t("no_suggestions") });
+                modal.appendChild(collEd.el);
+            }
+            lab(t("text_label"));
+            const pre = document.createElement("div");
+            pre.className = "plib-saveas-text";
+            pre.textContent = init.text.length > 400 ? init.text.slice(0, 400) + "…" : init.text;
+            modal.appendChild(pre);
+            const { cancel, ok } = modalActions(modal, t("save"));
             applyTheme(modal);
             document.body.appendChild(bg);
             inp.focus();
             inp.select();
-            const done = (val) => { bg.remove(); resolve(val); };
+            const done = (v) => { tagsEd.destroy(); collEd && collEd.destroy(); bg.remove(); resolve(v); };
             cancel.addEventListener("click", () => done(null));
-            bg.addEventListener("click", (e) => { if (e.target === bg) done(null); });
-            ok.addEventListener("click", () => done(inp.value));
-            inp.addEventListener("keydown", (e) => {
-                if (e.key === "Enter") { e.preventDefault(); ok.click(); }
-                if (e.key === "Escape") done(null);
-            });
+            bg.addEventListener("mousedown", (e) => { if (e.target === bg) done(null); });
+            ok.addEventListener("click", () => done({ title: inp.value.trim() || init.title, tags: tagsEd.get(), colls: collEd ? collEd.get() : [] }));
+            inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); ok.click(); } });
+            modal.addEventListener("keydown", (e) => { if (e.key === "Escape") done(null); });
         });
     }
     function openManageTab() {
@@ -896,8 +1351,9 @@
     function applyLibrary(raw) {
         let data = null;
         try { data = typeof raw === "string" ? JSON.parse(raw) : raw; } catch (_) { return; }
-        if (Array.isArray(data)) { library = data; return; }
+        if (Array.isArray(data)) { library = data; updateAllBars(); return; }
         if (!data || typeof data !== "object") return;
+        const prevById = new Map(library.map(p => [p.id, p]));
         if (Array.isArray(data.prompts)) library = data.prompts;
         if ("collections" in data) {
             collections = Array.isArray(data.collections) ? data.collections : null;
@@ -911,8 +1367,33 @@
                 const ch = data.change || {};
                 // Contract: tell other plugins (Reference Library) that prompts or links changed.
                 window.dispatchEvent(new CustomEvent("promptlib:changed", { detail: { revision: rev, reason: ch.reason || null, id: ch.id || null } }));
+                syncManager(prevById);
             }
         }
+        // A loaded prompt deleted elsewhere is no longer "current".
+        if (lastRevision !== null) for (const tab of [...current.keys()]) { const c = current.get(tab); if (c && !library.some(p => p.id === c.id)) setCurrent(tab, null); }
+        updateAllBars();
+    }
+    // Manager tab: refresh its list after any library change; reload the editor fields of the selected prompt only when
+    // they still hold that prompt's previous values (no unsaved edits get overwritten).
+    let mgrFlag = "";
+    function boxVal(id) { const el = document.querySelector(`#${id} textarea, #${id} input`); return el ? el.value : null; }
+    function syncManager(prevById) {
+        const btn = document.getElementById("plib_mgr_ext");
+        if (!btn) return;
+        const sel = boxVal("plib_mgr_selected");
+        const prev = sel ? prevById.get(sel) : null;
+        mgrFlag = "";
+        if (prev) {
+            const tokens = [...document.querySelectorAll("#plib_mgr_collections .token")].map(x => x.textContent.trim()).sort();
+            const prevColls = linkedCollections(prev).map(c => c.name).sort();
+            const clean = boxVal("plib_mgr_title") === prev.title && normText(boxVal("plib_mgr_text")) === normText(prev.text)
+                && fold(boxVal("plib_mgr_tags") || "").replace(/\s+/g, "") === fold((prev.tags || []).join(",")).replace(/\s+/g, "")
+                && (!collections || JSON.stringify(tokens) === JSON.stringify(prevColls));
+            if (clean) mgrFlag = "reload";
+        }
+        clearTimeout(syncManager._t);
+        syncManager._t = setTimeout(() => btn.click(), 60);
     }
     function refreshMounts() {
         const tab = activeTab();
@@ -952,6 +1433,7 @@
             const bl = document.querySelector("#plib_browser_lang textarea, #plib_browser_lang input");
             if (bl && !bl.value) setText("plib_browser_lang", browserLang());
             refreshMounts();
+            updateAllBars();
         }, 1500);
     }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
@@ -971,7 +1453,10 @@
         collections: () => collections,
         collectionsFor: (id) => linkedCollections(library.find(p => p.id === id)),
         revision: () => lastRevision,
+        current: (tab) => { const c = getCurrent(tab || activeTab()); return c ? Object.assign({ modified: isModified(tab || activeTab()) }, c) : null; },
         _onRevision: onRevision,
+        _mgrFlag: () => mgrFlag,
+        _setCurrent: setCurrent,
         // test helpers
         _library: () => library,
         _mounts: () => mounts,

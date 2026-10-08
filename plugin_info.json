@@ -1,7 +1,7 @@
 {
   "name": "Prompt Library",
   "author": "sweetyshots123",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Reusable text prompt templates for WanGP: autocomplete search next to the prompt box (multi-word, accent-insensitive), insert with replace/append, a manager tab to create, edit, duplicate, delete, import and export prompts, and two-way links with Reference Library collections. English and Spanish. Library data lives in the plugin folder and survives updates.",
   "type": [
     "extension"

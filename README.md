@@ -1,6 +1,6 @@
 # Prompt Library — reusable text prompts for Wan2GP
 
-*[Español](README.es.md)* · MIT License · v1.1.0
+*[Español](README.es.md)* · MIT License · v1.2.0
 
 **Prompt Library** is a plugin for [Wan2GP / WanGP](https://github.com/deepbeepmeep/Wan2GP) that turns your best prompts into a searchable library of templates.
 
@@ -16,7 +16,7 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 ## Features
 
 **Autocomplete search**
-- A compact bar sits right under WanGP's main prompt (and in the queue **Edit** tab if enabled): search field with a placeholder, clear (×) button, **Save current** and **Manage** buttons. It is built from regular Gradio components, so it follows WanGP's **dark and light themes**.
+- A **Prompt Library** bar sits right under WanGP's main prompt (and in the queue **Edit** tab if enabled). It follows the same style as Reference Library's bar: a header with an icon and a status on the right, the search field (placeholder + clear ×), and the **Save**, **Save as…** and **Manage** buttons. It is built from regular Gradio components, so it follows WanGP's **dark and light themes**.
 - Multi-word queries use **AND**: every word must match somewhere in the title, tags or body.
 - Matching is **case-insensitive and accent-insensitive** (`cancion` finds `canción`). Partial words are fine.
 - Ranking: title matches first, then tags, then body text; then by last used / use count.
@@ -29,8 +29,12 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 - Optional **Undo** toast for a few seconds after inserting.
 - Simple template variables like `{subject}` open a small dialog to fill values before insert.
 
-**Save current**
-- Optional button next to the search box saves whatever is currently in the prompt as a new library entry.
+**Current prompt, Save and Save as… (1.2.0)**
+- The bar remembers the prompt you loaded, whether you picked it from the autocomplete or another plugin applied it (`promptlib:apply`, e.g. a Reference Library chip). It is kept per browser session and per tab (Generate / Edit). The header shows **Prompt “X” loaded**, plus a **modified** marker while WanGP's prompt differs from the saved text. For a template, the comparison uses the values you filled in.
+- **Save** overwrites the loaded prompt with WanGP's current text. The toast has **Undo**. If nothing is loaded, Save works like *Save as…*. If there are no changes, it just says so. If you save over a template whose `{variables}` are gone from the text, it asks first.
+- **Save as…** creates a **new** prompt from the current text and leaves the loaded one unchanged. Its dialog has the title (prefilled “X (copy)”), the tags and the Reference Library collections of the loaded prompt as a starting point, and a preview of the text. The new prompt becomes the current one. **Undo** in the toast deletes it again.
+- **Inline details:** under the bar, the current prompt's **tags** are chips with × plus a “+ tag” field that autocompletes from your existing tags. When Reference Library 1.1+ is present, its **collections** get the same editor, with a picker limited to the existing collections. Changes are saved immediately and the toast has **Undo**. The *Save as…* dialog uses the same chip editors, but there nothing is saved until you confirm.
+- Every change fires `promptlib:changed`, so the manager tab refreshes its list, and its editor too unless it holds unsaved edits. Reference Library and other open pages refresh as well.
 
 **Manager (Prompt Library tab, or the Manage button)**
 - Library and editor on the left, settings on the right.
@@ -82,7 +86,7 @@ Invalid ids raise `ValueError`. Look the module up at call time, because plugin 
 - Dispatches `reflib:apply` `{id}` to load a collection.
 - Listens for `reflib:changed` (refreshes names) and `reflib:applied`.
 
-Prompt Library consumes `sys.modules["wan2gp_reference_library_api"]` (`API_VERSION` 1, `list_collections()`) and never reads Reference Library's files.
+Prompt Library consumes `sys.modules["wan2gp_reference_library_api"]` (any `API_VERSION` ≥ 1, `list_collections()`) and never reads Reference Library's files.
 
 ## How it works
 
@@ -97,7 +101,7 @@ Prompt Library consumes `sys.modules["wan2gp_reference_library_api"]` (`API_VERS
 | Language / Idioma | *Auto (browser language)*, *English* or *Español* | Auto |
 | Show search box next to the prompt | master switch for the autocomplete UI | on |
 | Also show it in the queue Edit tab | mount the search UI in Edit too | on |
-| “Save current prompt” button | button next to the search box | on |
+| “Save” / “Save as…” buttons in the bar | show the two save buttons | on |
 | How to insert | *Replace* / *Append* / *Insert at cursor* | Replace |
 | Offer “Undo” after inserting | undo toast | on |
 | Confirmation messages + Duration | toasts (errors always show) | on, 3.5 s |

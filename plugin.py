@@ -14,11 +14,12 @@ How it works
   * Reference Library link (1.1.0): each prompt has ``collections: [cid, ...]`` (this plugin is the single source of
     truth). Python API for other plugins: ``sys.modules["wan2gp_prompt_library_api"]`` (API_VERSION 1). Reference
     Library is consumed lazily through ``sys.modules["wan2gp_reference_library_api"]``; when it is missing (or a
-    different API_VERSION) every collection control is hidden and the plugin works as before.
+    API_VERSION < 1) every collection control is hidden and the plugin works as before.
 """
 from __future__ import annotations
 
 import copy
+import html
 import json
 import math
 import os
@@ -33,7 +34,7 @@ from shared.utils.plugins import WAN2GPPlugin
 
 from . import storage
 
-PLUGIN_VERSION = "1.1.0"
+PLUGIN_VERSION = "1.2.0"
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(_PLUGIN_DIR, "settings.json")
 
@@ -65,7 +66,7 @@ TEXT = {
         "toasts": "Confirmation messages",
         "toasts_info": "Errors are always shown.",
         "toast_s": "Duration (seconds)",
-        "save_btn_near": "“Save current prompt” button next to the search box",
+        "save_btn_near": "“Save” / “Save as…” buttons in the bar",
         "save": "Save settings",
         "saved": "✅ Settings saved and applied ({time}).",
         "save_failed": "❌ Could not save `settings.json`: {error}",
@@ -102,8 +103,14 @@ TEXT = {
         "inserted": "Prompt “{title}” inserted",
         "appended": "Prompt “{title}” appended",
         "saved_current": "✅ Current prompt saved as “{title}”.",
+        "saved_over": "Prompt “{title}” updated",
+        "saved_as": "Saved as new prompt “{title}”",
+        "meta_saved": "“{title}” updated",
+        "save_undone": "Change undone",
+        "bar_title": "Prompt Library",
         "bar_search_ph": "Search prompts…",
-        "bar_save": "Save current",
+        "bar_save": "Save",
+        "bar_save_as": "Save as…",
         "bar_manage": "Manage",
         "undone": "Previous prompt restored",
         "mgr_collections": "Collections",
@@ -140,7 +147,7 @@ TEXT = {
         "toasts": "Mensajes de confirmación",
         "toasts_info": "Los errores se muestran siempre.",
         "toast_s": "Duración (segundos)",
-        "save_btn_near": "Botón «Guardar prompt actual» junto a la búsqueda",
+        "save_btn_near": "Botones «Guardar» / «Guardar como…» en la barra",
         "save": "Guardar ajustes",
         "saved": "✅ Ajustes guardados y aplicados ({time}).",
         "save_failed": "❌ No se pudo guardar `settings.json`: {error}",
@@ -177,8 +184,14 @@ TEXT = {
         "inserted": "Prompt «{title}» insertado",
         "appended": "Prompt «{title}» añadido",
         "saved_current": "✅ Prompt actual guardado como «{title}».",
+        "saved_over": "Prompt «{title}» actualizado",
+        "saved_as": "Guardado como prompt nuevo «{title}»",
+        "meta_saved": "«{title}» actualizado",
+        "save_undone": "Cambio deshecho",
+        "bar_title": "Prompt Library",
         "bar_search_ph": "Buscar prompts…",
-        "bar_save": "Guardar actual",
+        "bar_save": "Guardar",
+        "bar_save_as": "Guardar como…",
         "bar_manage": "Gestionar",
         "undone": "Prompt anterior restaurado",
         "mgr_collections": "Colecciones",
@@ -236,11 +249,17 @@ def reflib_api():
     mod = sys.modules.get(REFLIB_API_MODULE)
     if mod is None:
         return None
-    if getattr(mod, "API_VERSION", None) != REFLIB_API_VERSION or not callable(getattr(mod, "list_collections", None)):
-        key = ("version", getattr(mod, "API_VERSION", None))
+    raw_version = getattr(mod, "API_VERSION", None)
+    try:
+        # Major-compatible: any API_VERSION >= 1 keeps the v1 functions (agreed with the Reference Library owner).
+        ok = not isinstance(raw_version, bool) and int(raw_version) >= REFLIB_API_VERSION
+    except (TypeError, ValueError):
+        ok = False
+    if not ok or not callable(getattr(mod, "list_collections", None)):
+        key = ("version", repr(raw_version))
         if key not in _reflib_warned:
             _reflib_warned.add(key)
-            print(f"[Prompt Library] Reference Library API version {key[1]!r} not supported (need {REFLIB_API_VERSION}); collection links hidden")
+            print(f"[Prompt Library] Reference Library API version {raw_version!r} not supported (need >= {REFLIB_API_VERSION}); collection links hidden")
         return None
     return mod
 
@@ -476,6 +495,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         self.targets = {}  # "generate:prompt" -> {tab, field, component}
         self._lock = threading.Lock()
         self._undo = {}  # id -> {field_key, previous, expires}
+        self._save_undo = {}  # id -> {kind: "update"|"create", id, before, expires}  (bar Save / Save as / tags)
 
     # ------------------------------------------------------------ plugin API
     def setup_ui(self):
@@ -504,15 +524,27 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         return {}
 
     def create_bar(self, tab):
+        # Same layout family as Reference Library's bar (header with icon + status, a control row, extra rows), but a
+        # separate block with its own .plib-* classes. The status / details rows are filled by prompt_library.js
+        # (current prompt per browser session), the server never re-renders them.
         lang = resolve_lang(load_settings()["language"])
-        with gr.Group(elem_id=f"plib_bar_{tab}", elem_classes=["plib-bar"]) as bar:
-            with gr.Row(equal_height=True, elem_classes=["plib-bar-row"]):
+        with gr.Column(elem_id=f"plib_bar_{tab}", elem_classes=["plib-panel", "plib-bar"]) as bar:
+            with gr.Row(elem_classes=["plib-bar-head"]):
+                gr.HTML(f'<div class="plib-bar-title"><span class="plib-bar-ico" aria-hidden="true"></span>{html.escape(tr(lang, "bar_title"))}</div>',
+                        elem_id=f"plib_bar_title_{tab}", elem_classes=["plib-bar-titlebox"], padding=False)
+                gr.HTML("", elem_id=f"plib_bar_status_{tab}", elem_classes=["plib-bar-status"], padding=False)
+            with gr.Row(elem_classes=["plib-row", "plib-bar-row"]):
                 gr.Textbox(value="", placeholder=tr(lang, "bar_search_ph"), show_label=False, container=False, lines=1, max_lines=1,
-                           interactive=True, scale=6, min_width=180, elem_id=f"plib_search_{tab}", elem_classes=["plib-search-box"])
-                gr.Button(tr(lang, "bar_save"), size="sm", variant="secondary", scale=0, min_width=112,
-                          elem_id=f"plib_savecur_{tab}", elem_classes=["plib-save-btn"])
-                gr.Button(tr(lang, "bar_manage"), size="sm", variant="secondary", scale=0, min_width=92,
-                          elem_id=f"plib_manage_{tab}", elem_classes=["plib-manage-btn"])
+                           interactive=True, scale=1, min_width=180, elem_id=f"plib_search_{tab}", elem_classes=["plib-ctl", "plib-search-box"])
+                with gr.Row(elem_classes=["plib-btns"]):
+                    gr.Button(tr(lang, "bar_save"), size="lg", scale=0, min_width=0,
+                              elem_id=f"plib_save_{tab}", elem_classes=["plib-btn", "plib-ico-save", "plib-save-btn"])
+                    gr.Button(tr(lang, "bar_save_as"), size="lg", scale=0, min_width=0,
+                              elem_id=f"plib_saveas_{tab}", elem_classes=["plib-btn", "plib-ico-saveas", "plib-saveas-btn"])
+                    gr.Button(tr(lang, "bar_manage"), size="lg", scale=0, min_width=0,
+                              elem_id=f"plib_manage_{tab}", elem_classes=["plib-btn", "plib-ico-manage", "plib-manage-btn"])
+            # Tags / Reference Library collections of the current prompt (inline editors, hidden when none is loaded).
+            gr.HTML("", elem_id=f"plib_bar_meta_{tab}", elem_classes=["plib-bar-meta"], padding=False)
         return bar
 
     def targets_for_js(self):
@@ -676,6 +708,8 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             reflib_btn = gr.Button("reflib", elem_id="plib_reflib_refresh")
             rev_box = gr.Textbox(value="", elem_id="plib_rev", show_label=False)
             poll_btn = gr.Button("poll", elem_id="plib_poll")
+            mgr_ext_btn = gr.Button("mgr-ext", elem_id="plib_mgr_ext")
+            mgr_ext_flag = gr.Textbox(value="", elem_id="plib_mgr_ext_flag", show_label=False)
             # One bridge button per registered prompt field. Inputs include both prompt fields of that tab
             # so we can update the right one (or both) without touching core WanGP files.
             by_tab = {}
@@ -935,6 +969,25 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             outputs=[mgr_status, ui["mgr_list"], library_json], show_progress="hidden",
         ).then(fn=None, inputs=[library_json], outputs=None,
                js="(lib) => { if (window.promptLibrary) window.promptLibrary.applyLibrary(lib); }")
+        # Library changed elsewhere (bar Save / Save as / tags, Python API, another browser): refresh the list and, when the
+        # page says the editor holds no unsaved edits ("reload"), the selected prompt's fields too.
+        def ext_refresh(query, pid, flag):
+            out = [refresh_list(query or "", pid or None)]
+            if flag == "reload" and pid:
+                try:
+                    item = storage.get_prompt(pid)
+                    out += [item["title"], item["text"], ", ".join(item.get("tags") or []), item.get("category") or "", colls_update(item)]
+                    return out
+                except storage.StorageError:
+                    pass
+            return out + [gr.skip()] * 5
+
+        mgr_ext_btn.click(
+            fn=ext_refresh, inputs=[ui["mgr_search"], selected_id, mgr_ext_flag],
+            outputs=[ui["mgr_list"], ui["mgr_title"], ui["mgr_text"], ui["mgr_tags"], ui["mgr_category"], ui["mgr_collections"]],
+            show_progress="hidden", queue=False,
+            js="(q, pid, f) => [q, pid, (window.promptLibrary && window.promptLibrary._mgrFlag()) || '']",
+        )
         ui["mgr_export_json"].click(
             fn=do_export_json, inputs=[browser_lang], outputs=[import_box, mgr_status], show_progress="hidden",
         )
@@ -998,8 +1051,14 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                 return self._action_insert(tab, req, prompt_val, wizard_val, lang)
             if action == "undo":
                 return self._action_undo(tab, req, prompt_val, wizard_val, lang)
-            if action == "save_current":
-                return self._action_save_current(tab, req, prompt_val, wizard_val, lang)
+            if action in ("save_current", "save_as"):
+                return self._action_save_as(tab, req, prompt_val, wizard_val, lang)
+            if action == "update_text":
+                return self._action_update_text(tab, req, prompt_val, wizard_val, lang)
+            if action == "set_meta":
+                return self._action_set_meta(tab, req, prompt_val, wizard_val, lang)
+            if action == "undo_save":
+                return self._action_undo_save(tab, req, prompt_val, wizard_val, lang)
             if action == "mark_used":
                 pid = req.get("id")
                 storage.mark_used(pid)
@@ -1101,6 +1160,8 @@ class PromptLibraryPlugin(WAN2GPPlugin):
             "mode": mode,
             "field": field,
             "value": new_val,
+            "text": text,  # the rendered prompt (template values applied): baseline of the bar's "modified" indicator
+            "prompt_id": item["id"] if item is not None else None,
             "id": req.get("req_id"),
             "tab": tab,
         }
@@ -1121,26 +1182,108 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         resp = {"ok": True, "toast": tr(lang, "undone"), "value": previous, "id": req.get("req_id"), "tab": tab}
         return self._pack(tab, resp, prompt_val, wizard_val, previous, previous)
 
-    def _action_save_current(self, tab, req, prompt_val, wizard_val, lang):
+    # ----------------------------------------------------- bar: Save / Save as / tags + collections (undo-friendly)
+    def _remember_save(self, kind, pid, before=None):
+        undo_id = f"s{time.time():.6f}-{os.urandom(3).hex()}"
+        now = time.time()
+        with self._lock:
+            for key in [k for k, v in self._save_undo.items() if v["expires"] < now]:
+                self._save_undo.pop(key, None)
+            self._save_undo[undo_id] = {"kind": kind, "id": pid, "before": before, "expires": now + 120}
+        return undo_id
+
+    @staticmethod
+    def _snapshot(item):
+        return {"title": item["title"], "text": item["text"], "tags": list(item.get("tags") or []),
+                "collections": list(item.get("collections") or [])}
+
+    @staticmethod
+    def _links_from_request(req, previous):
+        """Collections to store: the visible ones the page selected + links Reference Library does not list now (kept)."""
+        if not isinstance(req.get("collections"), list):
+            return None  # not sent: leave links untouched
+        cols = reflib_collections()
+        if cols is None:
+            return None  # Reference Library unavailable: never touch links
+        return merge_links([str(c) for c in req["collections"]], previous or [], [c["id"] for c in cols])
+
+    def _request_text(self, req, prompt_val, wizard_val):
         field = req.get("field") or "prompt"
-        current = prompt_val if field == "prompt" else wizard_val
-        # Prefer explicit text from the browser (visible textarea), fall back to Gradio value.
         text = req.get("text")
         if text is None:
-            text = current
-        text = "" if text is None else str(text)
+            text = prompt_val if field == "prompt" else wizard_val
+        return "" if text is None else str(text)
+
+    def _action_save_as(self, tab, req, prompt_val, wizard_val, lang):
+        text = self._request_text(req, prompt_val, wizard_val)
         title = (req.get("title") or "").strip() or (text.split("\n", 1)[0][:60] if text.strip() else "")
         if not text.strip() and not title:
             return self._pack(tab, {"ok": False, "error": tr(lang, "need_title_or_text")}, prompt_val, wizard_val, None, None)
-        tags = req.get("tags")
-        category = req.get("category") or ""
-        item = storage.create_prompt(title, text, tags=tags, category=category)
+        source_links = []
+        if req.get("from_id"):
+            try:
+                source_links = storage.get_prompt(req["from_id"]).get("collections") or []
+            except storage.StorageError:
+                source_links = []
+        links = self._links_from_request(req, source_links)
+        item = storage.create_prompt(title, text, tags=req.get("tags"), category=req.get("category") or "", collections=links)
+        legacy = (req.get("action") or "") == "save_current"
         resp = {
             "ok": True,
-            "toast": tr(lang, "saved_current", title=item["title"]),
+            "toast": tr(lang, "saved_current" if legacy else "saved_as", title=item["title"]),
             "item": item,
+            "save_undo_id": self._remember_save("create", item["id"]),
             "id": req.get("req_id"),
         }
+        resp.update(self._lib_resp())
+        return self._pack(tab, resp, prompt_val, wizard_val, None, None)
+
+    def _action_update_text(self, tab, req, prompt_val, wizard_val, lang):
+        before = storage.get_prompt(req.get("id"))
+        text = self._request_text(req, prompt_val, wizard_val)
+        if not text.strip():
+            return self._pack(tab, {"ok": False, "error": tr(lang, "need_title_or_text")}, prompt_val, wizard_val, None, None)
+        item = storage.update_prompt(before["id"], text=text)
+        resp = {
+            "ok": True, "toast": tr(lang, "saved_over", title=item["title"]), "item": item,
+            "save_undo_id": self._remember_save("update", item["id"], self._snapshot(before)), "id": req.get("req_id"),
+        }
+        resp.update(self._lib_resp())
+        return self._pack(tab, resp, prompt_val, wizard_val, None, None)
+
+    def _action_set_meta(self, tab, req, prompt_val, wizard_val, lang):
+        before = storage.get_prompt(req.get("id"))
+        fields = {}
+        if isinstance(req.get("tags"), list):
+            fields["tags"] = [str(t) for t in req["tags"]]
+        if "title" in req and str(req.get("title") or "").strip():
+            fields["title"] = str(req["title"]).strip()
+        links = self._links_from_request(req, before.get("collections"))
+        if links is not None:
+            fields["collections"] = links
+        if not fields:
+            return self._pack(tab, dict({"ok": True, "item": before}, **self._lib_resp()), prompt_val, wizard_val, None, None)
+        item = storage.update_prompt(before["id"], **fields)
+        resp = {
+            "ok": True, "toast": tr(lang, "meta_saved", title=item["title"]), "item": item,
+            "save_undo_id": self._remember_save("update", item["id"], self._snapshot(before)), "id": req.get("req_id"),
+        }
+        resp.update(self._lib_resp())
+        return self._pack(tab, resp, prompt_val, wizard_val, None, None)
+
+    def _action_undo_save(self, tab, req, prompt_val, wizard_val, lang):
+        with self._lock:
+            entry = self._save_undo.pop(req.get("undo_id") or "", None)
+        if not entry or entry["expires"] < time.time():
+            return self._pack(tab, {"ok": False, "error": tr(lang, "bad_request")}, prompt_val, wizard_val, None, None)
+        if entry["kind"] == "create":
+            storage.delete_prompt(entry["id"])
+            item = None
+        else:
+            b = entry["before"]
+            item = storage.update_prompt(entry["id"], title=b["title"], text=b["text"], tags=b["tags"], collections=b["collections"])
+        resp = {"ok": True, "toast": tr(lang, "save_undone"), "item": item, "undo_kind": entry["kind"],
+                "undone_id": entry["id"], "id": req.get("req_id")}
         resp.update(self._lib_resp())
         return self._pack(tab, resp, prompt_val, wizard_val, None, None)
 

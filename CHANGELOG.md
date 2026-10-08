@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.2.0 — 2026-10-08
+
+- **New bar under WanGP's prompt, in the same style as Reference Library's bar.** It is still a separate block.
+  - A **Prompt Library** header with an icon, and a status on the right: *Prompt “X” loaded*, plus a **modified** marker.
+  - The search box, and buttons with icons and the same 36 px height as Reference Library's: **Save**, **Save as…** and **Manage**.
+  - It replaces the old *Save current* button.
+- **Current prompt:**
+  - Picking from the autocomplete or receiving `promptlib:apply` remembers that prompt, per browser session and per tab.
+  - It is shown as **modified** while WanGP's text differs from the saved one. For templates, the comparison uses the values you filled in.
+  - If the prompt is deleted elsewhere, the bar clears it. Undoing an insert gives back the previously loaded prompt.
+- **Save** overwrites the loaded prompt with WanGP's current text.
+  - The toast has **Undo**.
+  - With nothing loaded, it works like *Save as…*. With no changes, it only shows a notice.
+  - It asks before saving over a template whose `{variables}` would be lost.
+- **Save as…** creates a new prompt.
+  - Its dialog has the title (prefilled “X (copy)”), tags and collections copied from the loaded prompt, and a text preview.
+  - The original is untouched and the new prompt becomes the current one. **Undo** deletes it.
+- **Inline tags and Reference Library collections** for the current prompt:
+  - Chips with ×, plus an add field. Tags autocomplete from existing tags; collections can only be picked from the existing ones, and only when the Reference Library API is present.
+  - Saved immediately, with **Undo**. The Save as dialog uses the same chip editor.
+  - Links to collections Reference Library doesn't list right now (for example ones in its trash) are kept.
+- **Manager tab refresh:** it refreshes on `promptlib:changed`, so it picks up changes from the bar, the Python API or other pages. Its editor reloads only when it has no unsaved edits.
+- New bridge actions `update_text`, `save_as`, `set_meta` and `undo_save`. `save_current` is still accepted. The insert response now includes the rendered text and the prompt id.
+- **Reference Library compatibility** (notes from Reference Library 1.1.0's owner):
+  - Any Reference Library `API_VERSION` ≥ 1 is accepted (major-compatible). It used to require exactly 1.
+  - `reflib:changed` with any reason (`duplicate`, …) just refreshes.
+  - Offering linked prompts on `reflib:applied` stays off by default, so prompts aren't offered twice.
+  - Tested end to end against the real Reference Library 1.1.0, with Dragger also enabled.
+
 ## 1.1.0 — 2026-10-08
 
 - **Two-way links with Reference Library collections** (needs Reference Library 1.1+, which has the matching API). Each prompt can have collections, and each collection lists its prompts. Prompt Library is the single source of truth (`collections: [...]` per prompt in `library.json`, schema 2). 1.0.x files are migrated transparently.

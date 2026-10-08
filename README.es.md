@@ -1,6 +1,6 @@
 # Prompt Library — prompts de texto reutilizables para Wan2GP
 
-*[English](README.md)* · Licencia MIT · v1.1.0
+*[English](README.md)* · Licencia MIT · v1.2.0
 
 **Prompt Library** es un plugin para [Wan2GP / WanGP](https://github.com/deepbeepmeep/Wan2GP) que convierte tus mejores prompts en una librería de plantillas buscable.
 
@@ -16,7 +16,7 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 ## Funciones
 
 **Búsqueda con autocompletado**
-- Una barra compacta justo bajo el prompt principal de WanGP (y en la pestaña **Editar** de la cola si está activado): campo de búsqueda con texto de ayuda, botón para borrar (×) y botones **Guardar actual** y **Gestionar**. Está hecha con componentes Gradio normales, así que sigue los **temas oscuro y claro** de WanGP.
+- Una barra **Prompt Library** justo bajo el prompt principal de WanGP (y en la pestaña **Editar** de la cola si está activado). Sigue el mismo estilo que la barra de Reference Library: cabecera con icono y estado a la derecha, el campo de búsqueda (texto de ayuda + borrar ×) y los botones **Guardar**, **Guardar como…** y **Gestionar**. Está hecha con componentes Gradio normales, así que sigue los **temas oscuro y claro** de WanGP.
 - Varias palabras = **AND**: todas tienen que aparecer en el título, las etiquetas o el texto.
 - Sin distinguir mayúsculas ni **acentos** (`cancion` encuentra `canción`). Valen coincidencias parciales.
 - Orden: primero coincidencias en el título, luego etiquetas, luego el cuerpo; después por uso reciente / frecuente.
@@ -29,8 +29,12 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 - Aviso opcional de **Deshacer** unos segundos después de insertar.
 - Variables simples como `{subject}` abren un diálogo para rellenarlas antes de insertar.
 
-**Guardar el actual**
-- Botón opcional junto a la búsqueda que guarda el contenido actual del prompt como entrada nueva.
+**Prompt actual, Guardar y Guardar como… (1.2.0)**
+- La barra recuerda el prompt que cargaste, tanto si lo elegiste en el autocompletado como si lo aplicó otro plugin (`promptlib:apply`, p. ej. un chip de Reference Library). Se guarda por sesión del navegador y por pestaña (Generar / Editar). La cabecera muestra **Prompt «X» cargado**, y una marca de **modificado** mientras el prompt de WanGP sea distinto del texto guardado. En una plantilla, se compara con los valores que rellenaste.
+- **Guardar** sobrescribe el prompt cargado con el texto actual de WanGP. El aviso trae **Deshacer**. Si no hay ninguno cargado, Guardar funciona como *Guardar como…*. Si no hay cambios, solo lo indica. Si guardas encima de una plantilla y sus `{variables}` ya no están en el texto, pregunta antes.
+- **Guardar como…** crea un prompt **nuevo** con el texto actual y deja el cargado sin cambios. Su diálogo tiene el título (con «X (copia)» ya escrito), las etiquetas y las colecciones de Reference Library del cargado como punto de partida, y una vista previa del texto. El nuevo pasa a ser el actual. **Deshacer** en el aviso lo borra de nuevo.
+- **Detalles en línea:** bajo la barra, las **etiquetas** del prompt actual aparecen como chips con × y un campo «+ etiqueta» que autocompleta con tus etiquetas existentes. Si está Reference Library 1.1+, sus **colecciones** tienen el mismo editor, con un selector limitado a las colecciones existentes. Los cambios se guardan al momento y el aviso trae **Deshacer**. El diálogo *Guardar como…* usa los mismos editores de chips, pero ahí no se guarda nada hasta que confirmas.
+- Cada cambio emite `promptlib:changed`, así que la pestaña del gestor refresca su lista, y también su editor salvo que tenga cambios sin guardar. Reference Library y otras páginas abiertas también se refrescan.
 
 **Gestor (pestaña Prompt Library, o el botón Gestionar)**
 - Librería y editor a la izquierda, ajustes a la derecha.
@@ -82,7 +86,7 @@ Los vínculos solo viven en `library.json` de Prompt Library (`collections: [id 
 | Language / Idioma | *Auto (idioma del navegador)*, *English* o *Español* | Auto |
 | Mostrar el cuadro de búsqueda junto al prompt | interruptor maestro de la UI | sí |
 | Mostrarlo también en la pestaña Editar de la cola | montar la búsqueda también en Editar | sí |
-| Botón «Guardar prompt actual» | botón junto a la búsqueda | sí |
+| Botones «Guardar» / «Guardar como…» en la barra | muestra los dos botones de guardar | sí |
 | Cómo insertar | *Reemplazar* / *Añadir al final* / *Insertar en el cursor* | Reemplazar |
 | Ofrecer «Deshacer» tras insertar | aviso de deshacer | sí |
 | Mensajes de confirmación + Duración | avisos (los errores siempre se muestran) | sí, 3,5 s |
