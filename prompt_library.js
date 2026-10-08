@@ -23,6 +23,10 @@
             no_response: "no response from the server",
             empty_prompt: "the prompt box is empty",
             open_tab: "Open Prompt Library tab",
+            manage: "Manage",
+            clear: "Clear",
+            save_current_title: "Save the current prompt to the library",
+            keys_hint: "↑↓ to move · Enter to insert · Esc to close",
         },
         es: {
             search_ph: "Buscar prompts…",
@@ -40,6 +44,10 @@
             no_response: "sin respuesta del servidor",
             empty_prompt: "el cuadro de prompt está vacío",
             open_tab: "Abrir pestaña Prompt Library",
+            manage: "Gestionar",
+            clear: "Borrar",
+            save_current_title: "Guardar el prompt actual en la librería",
+            keys_hint: "↑↓ para moverte · Enter para insertar · Esc para cerrar",
         },
     };
     const browserLang = () => String(navigator.language || (navigator.languages && navigator.languages[0]) || "");
@@ -52,55 +60,149 @@
     }
 
     // ------------------------------------------------------------------ styles
+    // Every colour comes from Gradio's theme variables (so it follows WanGP's dark / light theme and its local
+    // overrides). Elements portaled to <body> (dropdown, dialogs) get those variables copied from the bar's own
+    // scope by applyTheme(), see below. Namespace: .plib-*
     const style = document.createElement("style");
     style.id = "plib-style";
     style.textContent = `
-.plib-wrap { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; position: relative; z-index: 20; }
-.plib-wrap[data-disabled="1"] { display: none !important; }
-.plib-search { flex: 1 1 220px; min-width: 160px; position: relative; }
-.plib-search input { width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 8px;
-  border: 1px solid rgba(148,163,184,.45); background: rgba(15,23,42,.55); color: inherit;
-  font: 500 13px/1.3 system-ui, sans-serif; outline: none; }
-.plib-search input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,.25); }
-.plib-save-btn, .plib-manage-btn { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 8px;
-  background: rgba(79,70,229,.25); border: 1px solid rgba(129,140,248,.45); font: 600 12px/1.2 system-ui, sans-serif; white-space: nowrap; }
-.plib-save-btn:hover, .plib-manage-btn:hover { background: rgba(79,70,229,.4); }
-.plib-dd { position: absolute; left: 0; right: 0; top: calc(100% + 4px); max-height: 320px; overflow: auto;
-  background: #0f172a; border: 1px solid #334155; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.45);
-  z-index: 10070; display: none; }
+/* ---- search bar (real Gradio Group / Textbox / Buttons, only small layout touches here) */
+.plib-bar { margin: 6px 0 4px !important; overflow: visible !important; }
+.plib-bar[data-disabled="1"], .plib-wrap[data-disabled="1"] { display: none !important; }
+.plib-bar .plib-bar-row { gap: 6px !important; align-items: center !important; flex-wrap: nowrap !important; padding: 4px !important;
+  background: var(--block-background-fill) !important; }
+.plib-bar .plib-save-btn, .plib-bar .plib-manage-btn { align-self: center !important; white-space: nowrap !important; flex: 0 0 auto !important;
+  min-height: 34px; }
+.plib-search-box { position: relative !important; min-width: 0 !important; }
+.plib-search-box input, .plib-search-box textarea { padding-left: 30px !important; padding-right: 30px !important; min-height: 34px; box-sizing: border-box; }
+.plib-search-box input::placeholder, .plib-search-box textarea::placeholder { color: var(--input-placeholder-color) !important; opacity: 1 !important; }
+.plib-search-box::before { content: ""; position: absolute; left: 10px; top: 50%; width: 14px; height: 14px; transform: translateY(-50%);
+  pointer-events: none; z-index: 2; background: var(--body-text-color-subdued); opacity: .9;
+  -webkit-mask: var(--plib-icon-search) center / contain no-repeat; mask: var(--plib-icon-search) center / contain no-repeat; }
+.plib-clear { all: unset; position: absolute; right: 7px; top: 50%; transform: translateY(-50%); z-index: 3; width: 20px; height: 20px;
+  border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; color: var(--body-text-color-subdued); }
+.plib-clear:hover { color: var(--body-text-color); background: var(--background-fill-secondary); }
+.plib-clear.show { display: flex; }
+.plib-clear svg { width: 10px; height: 10px; }
+:root { --plib-icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5' fill='none' stroke='black' stroke-width='2.4'/%3E%3Cpath d='M15.5 15.5L21 21' stroke='black' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
+/* ---- DOM-only fallback bar (only used if the Gradio bar could not be inserted) */
+.plib-wrap.plib-fallback { display: flex; gap: 6px; align-items: center; margin: 6px 0; padding: 4px; border-radius: var(--block-radius);
+  background: var(--block-background-fill); border: 1px solid var(--block-border-color); }
+.plib-fallback .plib-search-box { flex: 1 1 auto; }
+.plib-fallback input { width: 100%; height: 34px; border-radius: var(--input-radius); border: 1px solid var(--input-border-color);
+  background: var(--input-background-fill); color: var(--body-text-color); font: inherit; font-size: var(--input-text-size); outline: none; }
+.plib-fallback input:focus { border-color: var(--input-border-color-focus); box-shadow: var(--input-shadow-focus); }
+.plib-fallback button.plib-btn { all: unset; cursor: pointer; padding: var(--button-small-padding); border-radius: var(--button-small-radius);
+  background: var(--button-secondary-background-fill); color: var(--button-secondary-text-color); font-size: var(--button-small-text-size);
+  font-weight: var(--button-small-text-weight); white-space: nowrap; min-height: 30px; display: inline-flex; align-items: center; }
+.plib-fallback button.plib-btn:hover { background: var(--button-secondary-background-fill-hover); color: var(--button-secondary-text-color-hover); }
+/* ---- dropdown: portaled to <body>, position fixed, opaque, above every Gradio block */
+.plib-dd { position: fixed; z-index: 9990; display: none; box-sizing: border-box; max-height: min(360px, 50vh); overflow-y: auto;
+  overscroll-behavior: contain; padding: 4px; border-radius: var(--plib-radius, 8px);
+  background: var(--plib-bg); color: var(--plib-fg); border: 1px solid var(--plib-border);
+  box-shadow: 0 10px 28px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.2); font-family: var(--plib-font, inherit); isolation: isolate; }
 .plib-dd.open { display: block; }
-.plib-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(51,65,85,.6); }
-.plib-item:last-child { border-bottom: none; }
-.plib-item:hover, .plib-item.active { background: rgba(79,70,229,.28); }
-.plib-item-title { font: 600 13px/1.3 system-ui, sans-serif; color: #e2e8f0; }
-.plib-item-tags { font: 500 11px/1.3 system-ui, sans-serif; color: #94a3b8; margin-top: 2px; }
-.plib-item-snip { font: 400 12px/1.35 system-ui, sans-serif; color: #cbd5e1; margin-top: 4px; }
-.plib-item-snip mark, .plib-item-snip .plib-hl { background: rgba(250,204,21,.35); color: #fef9c3; border-radius: 3px; padding: 0 2px; }
-.plib-empty { padding: 12px; color: #94a3b8; font: 500 13px system-ui, sans-serif; }
+.plib-item { padding: 8px 10px; border-radius: calc(var(--plib-radius, 8px) - 2px); cursor: pointer; border: 1px solid transparent; }
+.plib-item + .plib-item { margin-top: 2px; }
+.plib-item:hover { background: var(--plib-hover); }
+.plib-item.active { background: var(--plib-active); border-color: var(--plib-accent); }
+.plib-item-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.plib-item-title { font-weight: 600; font-size: 13px; line-height: 1.3; color: var(--plib-fg); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.plib-item-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.plib-chip { font-size: 11px; line-height: 1.5; padding: 0 7px; border-radius: 999px; background: var(--plib-chip-bg); color: var(--plib-subdued);
+  border: 1px solid var(--plib-border); white-space: nowrap; }
+.plib-item-snip { margin-top: 4px; font-size: 12px; line-height: 1.4; color: var(--plib-subdued); overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.plib-hl { background: var(--plib-hl-bg); color: var(--plib-fg); border-radius: 3px; padding: 0 1px; font-weight: 600; }
+.plib-empty { padding: 10px 12px; color: var(--plib-subdued); font-size: 13px; }
+.plib-dd-foot { position: sticky; bottom: -4px; margin: 4px -4px -4px; padding: 5px 10px; font-size: 11px; color: var(--plib-subdued);
+  background: var(--plib-bg); border-top: 1px solid var(--plib-border); }
+/* ---- toasts (same family as Dragger's, opaque, theme accent) */
 .plib-toasts { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10080;
   display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; max-width: min(92vw, 640px); }
 .plib-toast { pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px;
-  font: 500 14px/1.35 system-ui, sans-serif; color: #fff; background: #4f46e5; box-shadow: 0 6px 22px rgba(0,0,0,.35);
+  font: 500 14px/1.35 system-ui, sans-serif; color: #fff; background: var(--color-accent, #2563eb); box-shadow: 0 6px 22px rgba(0,0,0,.35);
   opacity: 1; transition: opacity .3s; white-space: pre-line; }
 .plib-toast[data-kind="error"] { background: #b91c1c; }
-.plib-toast[data-kind="info"] { background: #1f2937; border: 1px solid #374151; }
+.plib-toast[data-kind="info"] { background: #1f2937; }
 .plib-toast.hiding { opacity: 0; }
-.plib-toast button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,.18);
-  font-weight: 700; white-space: nowrap; }
-.plib-toast button:hover { background: rgba(255,255,255,.3); }
-.plib-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 10090; display: flex; align-items: center; justify-content: center; }
-.plib-modal { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px 18px; min-width: min(92vw, 420px);
-  box-shadow: 0 16px 50px rgba(0,0,0,.5); color: #e2e8f0; }
-.plib-modal h3 { margin: 0 0 10px; font: 700 15px system-ui, sans-serif; }
-.plib-modal label { display: block; font: 500 12px system-ui, sans-serif; color: #94a3b8; margin: 8px 0 4px; }
-.plib-modal input { width: 100%; box-sizing: border-box; padding: 7px 10px; border-radius: 8px; border: 1px solid #334155;
-  background: #1e293b; color: #e2e8f0; font: 500 13px system-ui, sans-serif; }
-.plib-modal .plib-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-.plib-modal .plib-modal-actions button { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 8px;
-  background: rgba(79,70,229,.35); border: 1px solid rgba(129,140,248,.5); font: 600 12px system-ui, sans-serif; }
-.plib-modal .plib-modal-actions button.plib-secondary { background: transparent; }
+.plib-toast button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 6px; background: rgba(255,255,255,.2); font-weight: 700; white-space: nowrap; }
+.plib-toast button:hover { background: rgba(255,255,255,.32); }
+/* ---- dialogs (template variables, save current) */
+.plib-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 10090; display: flex; align-items: center; justify-content: center; }
+.plib-modal { background: var(--plib-bg); color: var(--plib-fg); border: 1px solid var(--plib-border); border-radius: var(--plib-radius, 8px);
+  padding: 16px 18px; width: min(92vw, 440px); box-shadow: 0 16px 50px rgba(0,0,0,.45); font-family: var(--plib-font, inherit); }
+.plib-modal h3 { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--plib-fg); }
+.plib-modal label { display: block; font-size: 12px; color: var(--plib-subdued); margin: 10px 0 4px; }
+.plib-modal input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: var(--plib-input-radius, 6px); border: 1px solid var(--plib-border);
+  background: var(--plib-input-bg); color: var(--plib-fg); font: inherit; font-size: 13px; outline: none; }
+.plib-modal input:focus { border-color: var(--plib-accent); }
+.plib-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.plib-modal-actions button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: var(--plib-btn-radius, 6px); font-size: 13px; font-weight: 600;
+  background: var(--plib-primary-bg); color: var(--plib-primary-fg); }
+.plib-modal-actions button.plib-secondary { background: var(--plib-secondary-bg); color: var(--plib-secondary-fg); }
+.plib-modal-actions button:hover { filter: brightness(1.1); }
+/* ---- manager tab */
+#plib_mgr_editor .plib-mgr-actions button, #plib_mgr_io_row button { flex: 0 1 auto !important; }
+#plib_intro p { margin-bottom: 4px; }
+.plib-mgr-filter { align-items: flex-end !important; }
+.plib-mgr-filter #plib_mgr_refresh { align-self: flex-end !important; margin: 0 8px 10px 0 !important; min-height: 36px; }
+.plib-sec { padding: 8px 12px 2px !important; background: var(--block-background-fill) !important; }
+.plib-sec h3 { margin: 0 !important; font-size: 14px !important; font-weight: 600 !important; }
+#plib_mgr_status:empty, #plib_status:empty { display: none; }
 `;
     document.head.appendChild(style);
+
+    // Resolve Gradio theme variables in the scope of `from` (WanGP overrides some of them locally) and copy them as
+    // --plib-* onto `to` (an element portaled to <body>). Colours are resolved to opaque rgb() values.
+    function resolveColor(from, expr) {
+        const probe = document.createElement("span");
+        probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none;color:" + expr;
+        from.appendChild(probe);
+        const c = getComputedStyle(probe).color;
+        probe.remove();
+        return c;
+    }
+    function isOpaque(c) {
+        const m = String(c).match(/rgba?\(([^)]+)\)/);
+        if (!m) return false;
+        const parts = m[1].split(/[ ,/]+/).filter(Boolean);
+        return parts.length < 4 || parseFloat(parts[3]) >= 0.98;
+    }
+    function firstOpaque(from, exprs) {
+        for (const e of exprs) { const c = resolveColor(from, e); if (isOpaque(c)) return c; }
+        return document.documentElement.classList.contains("dark") || document.body.classList.contains("dark") ? "rgb(30, 41, 59)" : "rgb(255, 255, 255)";
+    }
+    function themeSource() {
+        for (const s of mounts.values()) if (s.wrap && s.wrap.isConnected) return s.wrap;
+        return document.querySelector(".gradio-container") || document.body;
+    }
+    function applyTheme(to, from) {
+        from = from || themeSource();
+        const v = (name, fallback) => {
+            const val = getComputedStyle(from).getPropertyValue(name).trim();
+            return val || fallback;
+        };
+        const set = (k, val) => to.style.setProperty(k, val);
+        set("--plib-bg", firstOpaque(from, ["var(--block-background-fill)", "var(--background-fill-primary)", "var(--body-background-fill)"]));
+        set("--plib-fg", resolveColor(from, "var(--body-text-color)"));
+        set("--plib-subdued", resolveColor(from, "color-mix(in srgb, var(--body-text-color) 72%, var(--block-background-fill))"));
+        set("--plib-border", resolveColor(from, "var(--border-color-primary)"));
+        set("--plib-accent", resolveColor(from, "var(--color-accent)"));
+        set("--plib-input-bg", firstOpaque(from, ["var(--input-background-fill)", "var(--background-fill-secondary)", "var(--block-background-fill)"]));
+        set("--plib-hover", resolveColor(from, "color-mix(in srgb, var(--color-accent) 12%, transparent)"));
+        set("--plib-active", resolveColor(from, "color-mix(in srgb, var(--color-accent) 24%, transparent)"));
+        set("--plib-hl-bg", resolveColor(from, "color-mix(in srgb, var(--color-accent) 35%, transparent)"));
+        set("--plib-chip-bg", firstOpaque(from, ["var(--background-fill-secondary)", "var(--input-background-fill)", "var(--block-background-fill)"]));
+        set("--plib-primary-bg", resolveColor(from, "var(--button-primary-background-fill)"));
+        set("--plib-primary-fg", resolveColor(from, "var(--button-primary-text-color)"));
+        set("--plib-secondary-bg", resolveColor(from, "var(--button-secondary-background-fill)"));
+        set("--plib-secondary-fg", resolveColor(from, "var(--button-secondary-text-color)"));
+        set("--plib-radius", v("--radius-lg", "8px"));
+        set("--plib-input-radius", v("--input-radius", "6px"));
+        set("--plib-btn-radius", v("--button-small-radius", "6px"));
+        set("--plib-font", getComputedStyle(from).fontFamily || "inherit");
+    }
 
     // ------------------------------------------------------------------ fold / search (mirrors storage.py)
     function fold(s) {
@@ -140,11 +242,14 @@
             if (pos >= 0 && (idx < 0 || pos < idx)) { idx = pos; hit = w; }
         }
         if (idx < 0) return text.length > maxLen ? text.slice(0, maxLen) + "…" : text;
-        const start = Math.max(0, idx - 28);
-        const end = Math.min(text.length, idx + hit.length + maxLen - 40);
-        let chunk = text.slice(start, end);
-        const approx = text.slice(idx, idx + hit.length);
-        chunk = chunk.replace(approx, "⟦" + approx + "⟧");
+        let start = Math.max(0, idx - Math.min(70, Math.floor(maxLen / 3)));
+        if (start > 0) { // begin on a word boundary
+            const sp = text.slice(start, idx).indexOf(" ");
+            if (sp >= 0) start += sp + 1;
+        }
+        let end = Math.min(text.length, idx + hit.length + maxLen - 40);
+        if (end < text.length) { const sp = text.lastIndexOf(" ", end); if (sp > idx + hit.length) end = sp; }
+        const chunk = text.slice(start, idx) + "⟦" + text.slice(idx, idx + hit.length) + "⟧" + text.slice(idx + hit.length, end);
         return (start > 0 ? "…" : "") + chunk + (end < text.length ? "…" : "");
     }
     function escapeHtml(s) {
@@ -311,85 +416,165 @@
     }
 
     // ------------------------------------------------------------------ autocomplete UI
-    const mounts = new Map(); // tab -> { wrap, input, dd, activeIdx, results }
-    function ensureMount(tab) {
-        if (mounts.has(tab)) return mounts.get(tab);
+    // The bar is a real Gradio Group (#plib_bar_<tab>) built by plugin.py right after WanGP's prompt column:
+    // a Textbox (#plib_search_<tab>) + two small secondary Buttons. If it is missing (insertion failed) a DOM-only
+    // fallback bar is created under the visible prompt. The result list is portaled to <body> (position: fixed)
+    // so it is never clipped or painted under the Gradio blocks that follow the prompt.
+    const mounts = new Map(); // tab -> { wrap, input, dd, saveBtn, manageBtn, clearBtn, activeIdx, results }
+    const X_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>';
+    function setInputValue(input, value) {
+        const proto = input.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+        if (setter) setter.call(input, value); else input.value = value;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    function buildFallbackBar(tab) {
         const root = visiblePromptRoot(tab);
         if (!root) return null;
-        // Anchor under the prompt tools stack column when possible.
         const stack = root.closest(".wangp-prompt-tools-stack") || root.parentElement || root;
         const wrap = document.createElement("div");
-        wrap.className = "plib-wrap";
+        wrap.className = "plib-wrap plib-fallback";
+        wrap.innerHTML = `<div class="plib-search-box"><input type="text" autocomplete="off" spellcheck="false" /></div>
+          <button type="button" class="plib-btn plib-save-btn"></button><button type="button" class="plib-btn plib-manage-btn"></button>`;
+        stack.parentElement.insertBefore(wrap, stack.nextSibling);
+        return wrap;
+    }
+    function ensureMount(tab) {
+        const existing = mounts.get(tab);
+        if (existing && existing.input.isConnected) return existing;
+        if (existing) { existing.dd.remove(); mounts.delete(tab); }
+        let wrap = document.getElementById("plib_bar_" + tab);
+        let input = wrap && wrap.querySelector("#plib_search_" + tab + " input, #plib_search_" + tab + " textarea");
+        if (!wrap || !input) {
+            wrap = document.querySelector('.plib-fallback[data-tab="' + tab + '"]') || buildFallbackBar(tab);
+            if (!wrap) return null;
+            input = wrap.querySelector("input");
+        }
+        wrap.classList.add("plib-wrap");
         wrap.dataset.tab = tab;
-        wrap.innerHTML = `
-          <div class="plib-search">
-            <input type="search" autocomplete="off" spellcheck="false" class="plib-q" />
-            <div class="plib-dd" role="listbox"></div>
-          </div>
-          <button type="button" class="plib-save-btn"></button>
-          <button type="button" class="plib-manage-btn"></button>`;
-        // Insert after the prompt block
-        if (stack.nextSibling) stack.parentElement.insertBefore(wrap, stack.nextSibling);
-        else stack.parentElement.appendChild(wrap);
-        const input = wrap.querySelector(".plib-q");
-        const dd = wrap.querySelector(".plib-dd");
+        input.classList.add("plib-q");
+        input.setAttribute("autocomplete", "off");
+        input.setAttribute("spellcheck", "false");
+        input.setAttribute("role", "combobox");
+        input.setAttribute("aria-autocomplete", "list");
+        const box = input.closest(".plib-search-box") || input.parentElement;
+        box.classList.add("plib-search-box");
+        let clearBtn = box.querySelector(".plib-clear");
+        if (!clearBtn) {
+            clearBtn = document.createElement("button");
+            clearBtn.type = "button";
+            clearBtn.className = "plib-clear";
+            clearBtn.innerHTML = X_SVG;
+            box.appendChild(clearBtn);
+        }
         const saveBtn = wrap.querySelector(".plib-save-btn");
         const manageBtn = wrap.querySelector(".plib-manage-btn");
-        const state = { wrap, input, dd, saveBtn, manageBtn, activeIdx: -1, results: [] };
+        const dd = document.createElement("div");
+        dd.className = "plib-dd";
+        dd.dataset.tab = tab;
+        dd.setAttribute("role", "listbox");
+        document.body.appendChild(dd);
+        const state = { wrap, input, dd, saveBtn, manageBtn, clearBtn, activeIdx: -1, results: [] };
         mounts.set(tab, state);
         relabel(state);
-        input.addEventListener("input", () => renderDropdown(state));
-        input.addEventListener("focus", () => renderDropdown(state));
+        const syncClear = () => clearBtn.classList.toggle("show", !!input.value);
+        input.addEventListener("input", () => { syncClear(); if (!state.silent) renderDropdown(state); });
+        input.addEventListener("focus", () => { if (input.value || library.length) renderDropdown(state); });
         input.addEventListener("keydown", (e) => onKey(state, e));
         input.addEventListener("keyup", (e) => { if (e.key === "Escape") { e.preventDefault(); closeDropdown(state); } });
-        // Capture Esc even if Gradio steals bubbling keydown.
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape" && dd.classList.contains("open") && mounts.get(tab) === state) {
-                dd.classList.remove("open");
-                state.activeIdx = -1;
-            }
-        }, true);
         input.addEventListener("blur", () => setTimeout(() => {
-            if (!dd.matches(":hover") && document.activeElement !== input) dd.classList.remove("open");
+            if (!dd.matches(":hover") && document.activeElement !== input) closeDropdown(state);
         }, 180));
-        saveBtn.addEventListener("click", () => onSaveCurrent(tab));
-        manageBtn.addEventListener("click", openManageTab);
-        document.addEventListener("click", (e) => {
-            if (!wrap.contains(e.target)) dd.classList.remove("open");
-        });
+        clearBtn.addEventListener("mousedown", (e) => e.preventDefault());
+        clearBtn.addEventListener("click", () => { setInputValue(input, ""); syncClear(); input.focus(); renderDropdown(state); });
+        if (saveBtn) saveBtn.addEventListener("click", () => onSaveCurrent(tab));
+        if (manageBtn) manageBtn.addEventListener("click", openManageTab);
+        dd.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the input
+        syncClear();
         return state;
+    }
+    // One set of global listeners for all mounts (Esc in capture phase, outside click, reposition on scroll/resize).
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        for (const s of mounts.values()) if (s.dd.classList.contains("open")) closeDropdown(s);
+    }, true);
+    document.addEventListener("mousedown", (e) => {
+        for (const s of mounts.values()) if (!s.wrap.contains(e.target) && !s.dd.contains(e.target)) closeDropdown(s);
+    }, true);
+    const repositionAll = () => { for (const s of mounts.values()) if (s.dd.classList.contains("open")) position(s); };
+    window.addEventListener("scroll", repositionAll, true);
+    window.addEventListener("resize", repositionAll);
+    function position(state) {
+        const anchor = state.input.closest(".plib-bar-row") || state.input.closest(".plib-wrap") || state.input;
+        const r = anchor.getBoundingClientRect();
+        if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > innerHeight) { closeDropdown(state); return; }
+        const gap = 4;
+        const below = innerHeight - r.bottom - gap - 8;
+        const above = r.top - gap - 8;
+        const want = Math.min(360, innerHeight * 0.5);
+        const dd = state.dd;
+        dd.style.left = Math.max(8, r.left) + "px";
+        dd.style.width = Math.min(r.width, innerWidth - 16) + "px";
+        if (below >= Math.min(want, 180) || below >= above) {
+            dd.style.top = (r.bottom + gap) + "px"; dd.style.bottom = "auto";
+            dd.style.maxHeight = Math.max(120, Math.min(want, below)) + "px";
+        } else {
+            dd.style.top = "auto"; dd.style.bottom = (innerHeight - r.top + gap) + "px";
+            dd.style.maxHeight = Math.max(120, Math.min(want, above)) + "px";
+        }
     }
     function relabel(state) {
         if (!state) return;
         state.input.placeholder = t("search_ph");
-        state.saveBtn.textContent = t("save_current");
-        state.manageBtn.textContent = t("open_tab");
-        state.saveBtn.style.display = cfg.save_current_button === false ? "none" : "";
+        if (state.saveBtn) { state.saveBtn.textContent = t("save_current"); state.saveBtn.title = t("save_current_title");
+            state.saveBtn.style.display = cfg.save_current_button === false ? "none" : ""; }
+        if (state.manageBtn) { state.manageBtn.textContent = t("manage"); state.manageBtn.title = t("open_tab"); }
+        state.clearBtn && (state.clearBtn.title = t("clear"));
+    }
+    function openDropdown(state) {
+        applyTheme(state.dd, state.wrap);
+        state.dd.classList.add("open");
+        state.input.setAttribute("aria-expanded", "true");
+        position(state);
     }
     function renderDropdown(state) {
         const q = state.input.value;
         const results = searchLocal(q, 40);
         state.results = results;
         state.activeIdx = results.length ? 0 : -1;
-        if (!q && !results.length) { state.dd.classList.remove("open"); state.dd.innerHTML = ""; return; }
+        if (!q.trim() && !results.length) { closeDropdown(state); state.dd.innerHTML = ""; return; }
         if (!results.length) {
             state.dd.innerHTML = `<div class="plib-empty">${escapeHtml(t("no_results"))}</div>`;
-            state.dd.classList.add("open");
+            openDropdown(state);
             return;
         }
         state.dd.innerHTML = results.map((item, i) => {
-            const tags = (item.tags || []).join(", ");
-            const snip = highlightHtml(snippet(item, q));
-            return `<div class="plib-item${i === state.activeIdx ? " active" : ""}" data-i="${i}" role="option">
-              <div class="plib-item-title">${escapeHtml(item.title)}</div>
-              ${tags ? `<div class="plib-item-tags">${escapeHtml(t("tags") + ": " + tags)}</div>` : ""}
-              <div class="plib-item-snip">${snip}</div>
+            const chips = (item.tags || []).slice(0, 8).map(tag => `<span class="plib-chip">${escapeHtml(tag)}</span>`).join("");
+            const snip = highlightHtml(snippet(item, q, 220));
+            return `<div class="plib-item${i === state.activeIdx ? " active" : ""}" data-i="${i}" role="option" title="${escapeHtml(item.title)}">
+              <div class="plib-item-head"><div class="plib-item-title">${highlightHtml(titleHl(item.title, q))}</div></div>
+              ${chips ? `<div class="plib-item-tags" aria-label="${escapeHtml(t("tags"))}">${chips}</div>` : ""}
+              ${snip ? `<div class="plib-item-snip">${snip}</div>` : ""}
             </div>`;
-        }).join("");
-        state.dd.classList.add("open");
+        }).join("") + `<div class="plib-dd-foot">${escapeHtml(t("keys_hint"))}</div>`;
         state.dd.querySelectorAll(".plib-item").forEach(el => {
             el.addEventListener("mousedown", (e) => { e.preventDefault(); pick(state, Number(el.dataset.i)); });
+            el.addEventListener("mousemove", () => {
+                const i = Number(el.dataset.i);
+                if (i !== state.activeIdx) { state.activeIdx = i; syncActive(state, false); }
+            });
         });
+        openDropdown(state);
+    }
+    function titleHl(title, q) {
+        // mark the first matching query word in the title (accent-insensitive)
+        const words = fold(q).split(/\s+/).filter(Boolean);
+        const folded = fold(title);
+        for (const w of words) {
+            const i = folded.indexOf(w);
+            if (i >= 0) return title.slice(0, i) + "⟦" + title.slice(i, i + w.length) + "⟧" + title.slice(i + w.length);
+        }
+        return title;
     }
     function onKey(state, e) {
         if (!state.dd.classList.contains("open") && (e.key === "ArrowDown" || e.key === "Enter")) {
@@ -404,8 +589,8 @@
             e.preventDefault();
             state.activeIdx = (state.activeIdx - 1 + n) % n;
             syncActive(state);
-        } else if (e.key === "Enter" && n && state.activeIdx >= 0) {
-            e.preventDefault();
+        } else if (e.key === "Enter" && n && state.activeIdx >= 0 && state.dd.classList.contains("open")) {
+            e.preventDefault(); e.stopPropagation();
             pick(state, state.activeIdx);
         } else if (e.key === "Escape") {
             e.preventDefault(); e.stopPropagation();
@@ -415,19 +600,23 @@
     function closeDropdown(state) {
         if (!state) return;
         state.dd.classList.remove("open");
+        state.input.setAttribute("aria-expanded", "false");
         state.activeIdx = -1;
     }
-    function syncActive(state) {
+    function syncActive(state, scroll = true) {
         state.dd.querySelectorAll(".plib-item").forEach((el, i) => {
             el.classList.toggle("active", i === state.activeIdx);
-            if (i === state.activeIdx) el.scrollIntoView({ block: "nearest" });
+            el.setAttribute("aria-selected", i === state.activeIdx ? "true" : "false");
+            if (scroll && i === state.activeIdx) el.scrollIntoView({ block: "nearest" });
         });
     }
     async function pick(state, index) {
         const item = state.results[index];
         if (!item) return;
-        state.dd.classList.remove("open");
-        state.input.value = "";
+        closeDropdown(state);
+        state.silent = true;
+        try { setInputValue(state.input, ""); } finally { state.silent = false; }
+        state.clearBtn && state.clearBtn.classList.remove("show");
         const tab = state.wrap.dataset.tab || activeTab();
         let vars = null;
         if (item.vars && item.vars.length) {
@@ -479,6 +668,7 @@
             actions.appendChild(ok);
             modal.appendChild(actions);
             bg.appendChild(modal);
+            applyTheme(modal);
             document.body.appendChild(bg);
             const first = modal.querySelector("input");
             if (first) first.focus();
@@ -535,6 +725,7 @@
             actions.appendChild(ok);
             modal.appendChild(actions);
             bg.appendChild(modal);
+            applyTheme(modal);
             document.body.appendChild(bg);
             inp.focus();
             inp.select();

@@ -15,11 +15,11 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 ## Funciones
 
 **Búsqueda con autocompletado**
-- Un campo compacto bajo el prompt principal de WanGP (y en la pestaña **Editar** de la cola si está activado).
+- Una barra compacta justo bajo el prompt principal de WanGP (y en la pestaña **Editar** de la cola si está activado): campo de búsqueda con texto de ayuda, botón para borrar (×) y botones **Guardar actual** y **Gestionar**. Está hecha con componentes Gradio normales, así que sigue los **temas oscuro y claro** de WanGP.
 - Varias palabras = **AND**: todas tienen que aparecer en el título, las etiquetas o el texto.
 - Sin distinguir mayúsculas ni **acentos** (`cancion` encuentra `canción`). Valen coincidencias parciales.
 - Orden: primero coincidencias en el título, luego etiquetas, luego el cuerpo; después por uso reciente / frecuente.
-- El desplegable muestra título, etiquetas y un fragmento resaltado. Navega con **↑ ↓ Enter Esc** o el ratón.
+- El desplegable, opaco, muestra el título, las etiquetas como chips y un fragmento resaltado (máx. 2 líneas). Flota por encima del resto de la página y tiene scroll si hay muchos resultados. Navega con **↑ ↓ Enter Esc** o el ratón.
 - La búsqueda corre en el navegador sobre una copia en caché (rápida con cientos/miles de prompts).
 
 **Inserción**
@@ -31,7 +31,8 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 **Guardar el actual**
 - Botón opcional junto a la búsqueda que guarda el contenido actual del prompt como entrada nueva.
 
-**Gestor (pestaña Prompt Library)**
+**Gestor (pestaña Prompt Library, o el botón Gestionar)**
+- Librería y editor a la izquierda, ajustes a la derecha.
 - Lista + filtro, crear, editar, duplicar, eliminar (escribe `DELETE` para confirmar).
 - Etiquetas y categoría/colección opcional.
 - Importar / exportar en JSON (librería completa) o texto plano (bloques separados por `---`).

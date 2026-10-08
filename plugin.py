@@ -28,7 +28,7 @@ from shared.utils.plugins import WAN2GPPlugin
 
 from . import storage
 
-PLUGIN_VERSION = "1.0.0"
+PLUGIN_VERSION = "1.0.1"
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(_PLUGIN_DIR, "settings.json")
 
@@ -40,7 +40,7 @@ TEXT = {
     "en": {
         "intro": "Save reusable **prompt templates**, find them with autocomplete next to WanGP's prompt box "
                  "(type one or more words; accent-insensitive), and insert them with replace or append. "
-                 "Manage the library below. Data is stored in `library.json` in the plugin folder and survives updates.",
+                 "Manage the library on the left, settings on the right. Data is stored in `library.json` in the plugin folder and survives updates.",
         "language": "Language / Idioma",
         "language_info": "Auto = the browser language (Spanish if it is Spanish, English otherwise). Applies immediately.",
         "lang_auto": "Auto (browser language)",
@@ -96,12 +96,15 @@ TEXT = {
         "inserted": "Prompt “{title}” inserted",
         "appended": "Prompt “{title}” appended",
         "saved_current": "✅ Current prompt saved as “{title}”.",
+        "bar_search_ph": "Search prompts…",
+        "bar_save": "Save current",
+        "bar_manage": "Manage",
         "undone": "Previous prompt restored",
     },
     "es": {
         "intro": "Guarda **plantillas de prompt** reutilizables, encuéntralas con autocompletado junto al cuadro de prompt de WanGP "
                  "(escribe una o varias palabras; sin distinguir acentos) e insértalas reemplazando o añadiendo. "
-                 "Gestiona la librería abajo. Los datos están en `library.json` de la carpeta del plugin y sobreviven a las actualizaciones.",
+                 "Gestiona la librería a la izquierda y los ajustes a la derecha. Los datos están en `library.json` de la carpeta del plugin y sobreviven a las actualizaciones.",
         "language": "Language / Idioma",
         "language_info": "Auto = el idioma del navegador (español si está en español; si no, inglés). Se aplica al momento.",
         "lang_auto": "Auto (idioma del navegador)",
@@ -157,6 +160,9 @@ TEXT = {
         "inserted": "Prompt «{title}» insertado",
         "appended": "Prompt «{title}» añadido",
         "saved_current": "✅ Prompt actual guardado como «{title}».",
+        "bar_search_ph": "Buscar prompts…",
+        "bar_save": "Guardar actual",
+        "bar_manage": "Gestionar",
         "undone": "Prompt anterior restaurado",
     },
 }
@@ -282,6 +288,7 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         self.request_component("prompt")
         self.request_component("wizard_prompt")
         self.request_component("tab_id")
+        self.request_component("prompt_column_wizard")  # anchor: the search bar goes right after the prompt box
         self.add_custom_js(build_js())
         self.add_tab(tab_id="prompt_library", label="Prompt Library", component_constructor=self.create_ui)
 
@@ -294,7 +301,24 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                 print(f"[Prompt Library] {tab}:{field} not found, skipped")
                 continue
             self.targets[f"{tab}:{field}"] = {"tab": tab, "field": field, "component": comp}
+        # The search bar is made of real Gradio components (themed like the rest of WanGP), inserted right after the
+        # prompt column (visible in both the basic "wizard" and the advanced prompt modes). prompt_library.js
+        # wires the autocomplete to it; if the insertion is not possible it falls back to a DOM-only bar.
+        if components.get("prompt_column_wizard") is not None:
+            self.insert_after("prompt_column_wizard", lambda t=tab: self.create_bar(t))
         return {}
+
+    def create_bar(self, tab):
+        lang = resolve_lang(load_settings()["language"])
+        with gr.Group(elem_id=f"plib_bar_{tab}", elem_classes=["plib-bar"]) as bar:
+            with gr.Row(equal_height=True, elem_classes=["plib-bar-row"]):
+                gr.Textbox(value="", placeholder=tr(lang, "bar_search_ph"), show_label=False, container=False, lines=1, max_lines=1,
+                           interactive=True, scale=6, min_width=180, elem_id=f"plib_search_{tab}", elem_classes=["plib-search-box"])
+                gr.Button(tr(lang, "bar_save"), size="sm", variant="secondary", scale=0, min_width=112,
+                          elem_id=f"plib_savecur_{tab}", elem_classes=["plib-save-btn"])
+                gr.Button(tr(lang, "bar_manage"), size="sm", variant="secondary", scale=0, min_width=92,
+                          elem_id=f"plib_manage_{tab}", elem_classes=["plib-manage-btn"])
+        return bar
 
     def targets_for_js(self):
         out = []
@@ -371,56 +395,60 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         ui = {}
         gr.HTML("<style>.plib-hidden{display:none !important;}</style>")
         ui["intro"] = gr.Markdown(tx["intro"]["value"], elem_id="plib_intro")
-        with gr.Row():
-            ui["language"] = gr.Dropdown(value=current("language"), elem_id="plib_language", **tx["language"])
-        with gr.Group():
-            ui["sec_search"] = gr.Markdown(tx["sec_search"]["value"])
-            with gr.Row():
-                ui["enabled"] = gr.Checkbox(value=current("enabled"), elem_id="plib_enabled", **tx["enabled"])
-                ui["show_edit"] = gr.Checkbox(value=current("show_edit"), elem_id="plib_show_edit", **tx["show_edit"])
-                ui["save_btn_near"] = gr.Checkbox(value=current("save_current_button"), elem_id="plib_save_current_button", **tx["save_btn_near"])
-        with gr.Group():
-            ui["sec_insert"] = gr.Markdown(tx["sec_insert"]["value"])
-            with gr.Row():
-                ui["insert_mode"] = gr.Dropdown(value=current("insert_mode"), elem_id="plib_insert_mode", **tx["insert_mode"])
-                ui["undo"] = gr.Checkbox(value=current("undo"), elem_id="plib_undo", **tx["undo"])
-        with gr.Group():
-            ui["sec_messages"] = gr.Markdown(tx["sec_messages"]["value"])
-            with gr.Row():
-                ui["toasts"] = gr.Checkbox(value=current("toasts"), elem_id="plib_toasts", **tx["toasts"])
-                ui["toast_s"] = gr.Number(
-                    value=lambda: load_settings()["toast_ms"] / 1000,
-                    minimum=1, maximum=30, step=0.5, elem_id="plib_toast_s", **tx["toast_s"],
-                )
-        ui["save"] = gr.Button(tx["save"]["value"], variant="primary", elem_id="plib_save_settings")
-        status = gr.Markdown("", elem_id="plib_status")
-
-        # ---- manager
-        ui["sec_manager"] = gr.Markdown(tx["sec_manager"]["value"])
-        with gr.Row():
-            ui["mgr_search"] = gr.Textbox(value="", elem_id="plib_mgr_search", **tx["mgr_search"])
-            ui["mgr_refresh"] = gr.Button(tx["mgr_refresh"]["value"], elem_id="plib_mgr_refresh")
-        ui["mgr_list"] = gr.Dropdown(
-            choices=_list_choices(), value=None, elem_id="plib_mgr_list",
-            allow_custom_value=False, **tx["mgr_list"],
-        )
-        with gr.Row():
-            ui["mgr_title"] = gr.Textbox(elem_id="plib_mgr_title", **tx["mgr_title"])
-            ui["mgr_category"] = gr.Textbox(elem_id="plib_mgr_category", **tx["mgr_category"])
-        ui["mgr_tags"] = gr.Textbox(elem_id="plib_mgr_tags", **tx["mgr_tags"])
-        ui["mgr_text"] = gr.Textbox(lines=6, elem_id="plib_mgr_text", **tx["mgr_text"])
-        with gr.Row():
-            ui["mgr_new"] = gr.Button(tx["mgr_new"]["value"], elem_id="plib_mgr_new")
-            ui["mgr_save"] = gr.Button(tx["mgr_save"]["value"], variant="primary", elem_id="plib_mgr_save")
-            ui["mgr_dup"] = gr.Button(tx["mgr_dup"]["value"], elem_id="plib_mgr_dup")
-            ui["mgr_del"] = gr.Button(tx["mgr_del"]["value"], variant="stop", elem_id="plib_mgr_del")
-        ui["mgr_confirm_del"] = gr.Textbox(value="", elem_id="plib_mgr_confirm_del", **tx["mgr_confirm_del"])
-        with gr.Row():
-            ui["mgr_import"] = gr.Button(tx["mgr_import"]["value"], elem_id="plib_mgr_import")
-            ui["mgr_export_json"] = gr.Button(tx["mgr_export_json"]["value"], elem_id="plib_mgr_export_json")
-            ui["mgr_export_txt"] = gr.Button(tx["mgr_export_txt"]["value"], elem_id="plib_mgr_export_txt")
-        ui["mgr_io"] = import_box = gr.Textbox(lines=4, elem_id="plib_import_box", **tx["mgr_io"])
-        mgr_status = gr.Markdown("", elem_id="plib_mgr_status")
+        with gr.Row(equal_height=False, elem_id="plib_mgr_layout"):
+            # ---- manager (left, wide)
+            with gr.Column(scale=3, min_width=420, elem_id="plib_mgr_col"):
+                with gr.Group(elem_id="plib_mgr_lib"):
+                    ui["sec_manager"] = gr.Markdown(tx["sec_manager"]["value"], elem_classes=["plib-sec"])
+                    with gr.Row(equal_height=False, elem_classes=["plib-mgr-filter"]):
+                        ui["mgr_search"] = gr.Textbox(value="", scale=4, elem_id="plib_mgr_search", **tx["mgr_search"])
+                        ui["mgr_refresh"] = gr.Button(tx["mgr_refresh"]["value"], size="sm", variant="secondary", scale=0, min_width=100,
+                                                      elem_id="plib_mgr_refresh")
+                    ui["mgr_list"] = gr.Dropdown(
+                        choices=_list_choices(), value=None, elem_id="plib_mgr_list",
+                        allow_custom_value=False, **tx["mgr_list"],
+                    )
+                with gr.Group(elem_id="plib_mgr_editor"):
+                    with gr.Row():
+                        ui["mgr_title"] = gr.Textbox(scale=3, elem_id="plib_mgr_title", **tx["mgr_title"])
+                        ui["mgr_category"] = gr.Textbox(scale=2, elem_id="plib_mgr_category", **tx["mgr_category"])
+                    ui["mgr_tags"] = gr.Textbox(elem_id="plib_mgr_tags", **tx["mgr_tags"])
+                    ui["mgr_text"] = gr.Textbox(lines=6, elem_id="plib_mgr_text", **tx["mgr_text"])
+                with gr.Row(elem_classes=["plib-mgr-actions"]):
+                    ui["mgr_new"] = gr.Button(tx["mgr_new"]["value"], size="sm", variant="secondary", elem_id="plib_mgr_new")
+                    ui["mgr_save"] = gr.Button(tx["mgr_save"]["value"], size="sm", variant="primary", elem_id="plib_mgr_save")
+                    ui["mgr_dup"] = gr.Button(tx["mgr_dup"]["value"], size="sm", variant="secondary", elem_id="plib_mgr_dup")
+                    ui["mgr_del"] = gr.Button(tx["mgr_del"]["value"], size="sm", variant="stop", elem_id="plib_mgr_del")
+                ui["mgr_confirm_del"] = gr.Textbox(value="", elem_id="plib_mgr_confirm_del", **tx["mgr_confirm_del"])
+                mgr_status = gr.Markdown("", elem_id="plib_mgr_status")
+                with gr.Group(elem_id="plib_mgr_io"):
+                    with gr.Row(elem_id="plib_mgr_io_row"):
+                        ui["mgr_import"] = gr.Button(tx["mgr_import"]["value"], size="sm", variant="secondary", elem_id="plib_mgr_import")
+                        ui["mgr_export_json"] = gr.Button(tx["mgr_export_json"]["value"], size="sm", variant="secondary", elem_id="plib_mgr_export_json")
+                        ui["mgr_export_txt"] = gr.Button(tx["mgr_export_txt"]["value"], size="sm", variant="secondary", elem_id="plib_mgr_export_txt")
+                    ui["mgr_io"] = import_box = gr.Textbox(lines=4, elem_id="plib_import_box", **tx["mgr_io"])
+            # ---- settings (right, narrow)
+            with gr.Column(scale=2, min_width=300, elem_id="plib_settings_col"):
+                with gr.Group():
+                    ui["language"] = gr.Dropdown(value=current("language"), elem_id="plib_language", **tx["language"])
+                with gr.Group():
+                    ui["sec_search"] = gr.Markdown(tx["sec_search"]["value"], elem_classes=["plib-sec"])
+                    ui["enabled"] = gr.Checkbox(value=current("enabled"), elem_id="plib_enabled", **tx["enabled"])
+                    ui["show_edit"] = gr.Checkbox(value=current("show_edit"), elem_id="plib_show_edit", **tx["show_edit"])
+                    ui["save_btn_near"] = gr.Checkbox(value=current("save_current_button"), elem_id="plib_save_current_button", **tx["save_btn_near"])
+                with gr.Group():
+                    ui["sec_insert"] = gr.Markdown(tx["sec_insert"]["value"], elem_classes=["plib-sec"])
+                    ui["insert_mode"] = gr.Dropdown(value=current("insert_mode"), elem_id="plib_insert_mode", **tx["insert_mode"])
+                    ui["undo"] = gr.Checkbox(value=current("undo"), elem_id="plib_undo", **tx["undo"])
+                with gr.Group():
+                    ui["sec_messages"] = gr.Markdown(tx["sec_messages"]["value"], elem_classes=["plib-sec"])
+                    ui["toasts"] = gr.Checkbox(value=current("toasts"), elem_id="plib_toasts", **tx["toasts"])
+                    ui["toast_s"] = gr.Number(
+                        value=lambda: load_settings()["toast_ms"] / 1000,
+                        minimum=1, maximum=30, step=0.5, elem_id="plib_toast_s", **tx["toast_s"],
+                    )
+                ui["save"] = gr.Button(tx["save"]["value"], variant="primary", elem_id="plib_save_settings")
+                status = gr.Markdown("", elem_id="plib_status")
 
         tab_outputs = [ui[key] for key in self.TAB_KEYS]
 

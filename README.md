@@ -15,11 +15,11 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 ## Features
 
 **Autocomplete search**
-- A compact search field sits under WanGP's main prompt (and in the queue **Edit** tab if enabled).
+- A compact bar sits right under WanGP's main prompt (and in the queue **Edit** tab if enabled): search field with a placeholder, clear (×) button, **Save current** and **Manage** buttons. It is built from regular Gradio components, so it follows WanGP's **dark and light themes**.
 - Multi-word queries use **AND**: every word must match somewhere in the title, tags or body.
 - Matching is **case-insensitive and accent-insensitive** (`cancion` finds `canción`). Partial words are fine.
 - Ranking: title matches first, then tags, then body text; then by last used / use count.
-- Dropdown shows title, tags and a highlighted snippet. Navigate with **↑ ↓ Enter Esc** or the mouse.
+- The opaque dropdown shows the title, tags as chips and a highlighted snippet (2 lines max). It floats above the rest of the page and scrolls when there are many results. Navigate with **↑ ↓ Enter Esc** or the mouse.
 - Search runs **client-side** on a cached copy of the library (fast with hundreds/thousands of prompts).
 
 **Insert**
@@ -31,7 +31,8 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 **Save current**
 - Optional button next to the search box saves whatever is currently in the prompt as a new library entry.
 
-**Manager (Prompt Library tab)**
+**Manager (Prompt Library tab, or the Manage button)**
+- Library and editor on the left, settings on the right.
 - List + filter, create, edit, duplicate, delete (type `DELETE` to confirm).
 - Tags and optional category/collection.
 - Import / export as JSON (full library) or plain text (blocks separated by `---`).
