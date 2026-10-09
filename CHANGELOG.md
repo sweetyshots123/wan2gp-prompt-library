@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 — 2026-10-09
+
+- **Prompt history.** The prompt in the visible box is recorded when WanGP's **Generate** or **Add New Prompt To Queue** is clicked.
+  - The plugin only adds a CSS class to those buttons in `post_ui_setup`, and the page records on click. There are no Wan2GP core changes and no extra Gradio event on Generate.
+  - Consecutive identical prompts collapse into one entry with a refreshed timestamp, empty prompts are ignored, and the list is capped at 500 entries.
+- **History** button in the bar opens a dialog. Entries are newest first, with their date and an accent-insensitive multi-word search with highlights.
+  - Each entry has **Apply** (loads it into WanGP's prompt, with the usual Undo), **Save to library** (the existing *Save as…* dialog, prefilled) and **Delete**.
+  - **Clear history** asks for confirmation. A **Record history** checkbox turns recording off (`history` setting, default on).
+- Stored in `history.json` next to `library.json`: atomic writes, gitignored, never in the zip, and kept on update. New bridge actions: `history_add`, `history_list`, `history_delete`, `history_clear` and `history_enable`.
+- Toasts now show above dialogs. Dark and light themes, EN/ES.
+
 ## 1.2.1 — 2026-10-09
 
 - **Rename a tag everywhere.** Editing a tag renames that tag itself on every prompt; it does not create a new one.

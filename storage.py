@@ -744,3 +744,76 @@ def client_payload(path: Optional[str] = None) -> List[Dict[str, Any]]:
             "collections": list(item.get("collections") or []),
         })
     return out
+
+
+# ---------------------------------------------------------------- prompt history (1.3.0)
+# history.json (next to library.json, gitignored, never in the zip): prompts actually used in WanGP, newest first.
+#   {"version": 1, "entries": [{"id": "hex", "text": "...", "ts": 1696..., "tab": "generate"}, ...]}
+HISTORY_PATH = os.path.join(PLUGIN_DIR, "history.json")
+HISTORY_MAX = 500
+_HISTORY_TEXT_MAX = 20000
+
+
+def _hist_norm(text: str) -> str:
+    return str(text or "").replace("\r\n", "\n").strip()
+
+
+def load_history(path: Optional[str] = None) -> List[Dict[str, Any]]:
+    path = path or HISTORY_PATH
+    with _lock:
+        try:
+            with open(path, "r", encoding="utf-8") as reader:
+                raw = json.load(reader)
+        except FileNotFoundError:
+            return []
+        except Exception as e:
+            print(f"[Prompt Library] Ignoring invalid history.json: {e}")
+            return []
+        entries = raw.get("entries") if isinstance(raw, dict) else None
+        out = []
+        for e in entries if isinstance(entries, list) else []:
+            if not isinstance(e, dict) or not isinstance(e.get("text"), str) or not _hist_norm(e["text"]):
+                continue
+            hid = e.get("id") if isinstance(e.get("id"), str) and _ID_RE.match(e.get("id") or "") else uuid.uuid4().hex
+            ts = e.get("ts") if isinstance(e.get("ts"), (int, float)) and not isinstance(e.get("ts"), bool) else 0.0
+            out.append({"id": hid, "text": e["text"], "ts": float(ts), "tab": str(e.get("tab") or "generate")[:20]})
+        return out[:HISTORY_MAX]
+
+
+def _save_history(entries: List[Dict[str, Any]], path: Optional[str] = None) -> None:
+    _atomic_write_json(path or HISTORY_PATH, {"version": 1, "entries": entries[:HISTORY_MAX]})
+
+
+def add_history(text: str, tab: str = "generate", path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Record a used prompt. Empty text is ignored (None). The same text as the newest entry only refreshes its
+    timestamp (consecutive duplicates collapse). The list is capped at HISTORY_MAX (oldest dropped)."""
+    text = _hist_norm(text)[:_HISTORY_TEXT_MAX]
+    if not text:
+        return None
+    with _lock:
+        entries = load_history(path)
+        if entries and _hist_norm(entries[0]["text"]) == text:
+            entries[0]["ts"] = _now()
+            entry = dict(entries[0], duplicate=True)
+        else:
+            entries.insert(0, {"id": uuid.uuid4().hex, "text": text, "ts": _now(), "tab": str(tab or "generate")[:20]})
+            entry = dict(entries[0], duplicate=False)
+        _save_history(entries, path)
+        return entry
+
+
+def delete_history(entry_id: str, path: Optional[str] = None) -> bool:
+    with _lock:
+        entries = load_history(path)
+        kept = [e for e in entries if e["id"] != entry_id]
+        if len(kept) == len(entries):
+            return False
+        _save_history(kept, path)
+        return True
+
+
+def clear_history(path: Optional[str] = None) -> int:
+    with _lock:
+        n = len(load_history(path))
+        _save_history([], path)
+        return n

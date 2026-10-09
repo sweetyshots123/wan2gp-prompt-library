@@ -47,6 +47,18 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 **Ejemplos iniciales**
 - La primera vez se crean tres prompts con título `[Example] …`. Bórralos cuando quieras; solo sirven de semilla.
 
+## Historial de prompts (1.3.0)
+
+Se guarda cada prompt que usas de verdad: al pulsar **Generate** (o **Add New Prompt To Queue**) en WanGP, el texto del cuadro de prompt visible pasa al historial.
+- Ábrelo con **Historial** en la barra. Las entradas van de la más reciente a la más antigua, cada una con su fecha. La búsqueda usa la misma coincidencia de varias palabras sin distinguir acentos ni mayúsculas que la barra, y resalta lo encontrado.
+- Cada entrada tiene tres acciones:
+  - **Aplicar** la carga en el prompt de WanGP.
+  - **Guardar en biblioteca** abre el diálogo *Guardar como…* de siempre, ya relleno.
+  - **Borrar** la elimina.
+- **Vaciar historial** lo deja vacío tras pedir confirmación. La casilla **Guardar historial** del diálogo desactiva la grabación (se guarda en `settings.json`).
+- Repetir el mismo prompt seguido no crea un duplicado, solo actualiza la fecha. Se conservan las últimas 500 entradas.
+- Se guarda en `history.json`, aparte de la biblioteca.
+
 ## Colecciones de Reference Library (1.1.0)
 
 Si tienes [Reference Library](https://github.com/sweetyshots123/wan2gp-reference-library) **1.1 o posterior**, puedes asociar prompts y colecciones de imágenes entre sí:
@@ -107,8 +119,9 @@ Dentro de la carpeta del plugin (junto a `plugin.py`):
 
 - `library.json` — tus prompts y sus vínculos con colecciones de Reference Library (se crea al usarlo por primera vez, con 3 ejemplos).
 - `settings.json` — tus ajustes (se crea al guardar).
+- `history.json` — el historial de prompts (1.3.0; se crea con el primer Generate).
 
-Ninguno de los dos va en el zip ni en git.
+Ninguno de ellos va en el zip ni en git, así que actualizar el plugin los conserva.
 
 ## Licencia
 

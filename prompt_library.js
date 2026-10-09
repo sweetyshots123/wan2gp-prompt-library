@@ -25,6 +25,23 @@
             empty_prompt: "the prompt box is empty",
             open_tab: "Open Prompt Library tab",
             manage: "Manage",
+            history: "History",
+            history_title: "Prompts used to generate (newest first)",
+            hist_search_ph: "Search the history…",
+            hist_apply: "Apply",
+            hist_apply_title: "Load this prompt into WanGP's prompt box",
+            hist_save: "Save to library",
+            hist_delete: "Delete",
+            hist_clear: "Clear history",
+            hist_clear_confirm: "Delete all {n} history entries? This cannot be undone.",
+            hist_enabled: "Record history",
+            hist_empty: "No prompts yet: they are recorded when you click Generate.",
+            hist_off_note: "History is off: new prompts are not recorded.",
+            hist_no_match: "No entries match.",
+            hist_count: "{n} of {total}",
+            hist_entry: "History prompt",
+            hist_text_label: "Text (from the history)",
+            close: "Close",
             clear: "Clear",
             keys_hint: "↑↓ to move · Enter to insert · Esc to close",
             collections: "Collections",
@@ -75,6 +92,23 @@
             empty_prompt: "el cuadro de prompt está vacío",
             open_tab: "Abrir pestaña Prompt Library",
             manage: "Gestionar",
+            history: "Historial",
+            history_title: "Prompts usados para generar (los más recientes primero)",
+            hist_search_ph: "Buscar en el historial…",
+            hist_apply: "Aplicar",
+            hist_apply_title: "Cargar este prompt en el cuadro de prompt de WanGP",
+            hist_save: "Guardar en biblioteca",
+            hist_delete: "Borrar",
+            hist_clear: "Vaciar historial",
+            hist_clear_confirm: "¿Borrar las {n} entradas del historial? No se puede deshacer.",
+            hist_enabled: "Guardar historial",
+            hist_empty: "Aún no hay prompts: se guardan al pulsar Generate.",
+            hist_off_note: "El historial está desactivado: no se guardan prompts nuevos.",
+            hist_no_match: "Ninguna entrada coincide.",
+            hist_count: "{n} de {total}",
+            hist_entry: "Prompt del historial",
+            hist_text_label: "Texto (del historial)",
+            close: "Cerrar",
             clear: "Borrar",
             keys_hint: "↑↓ para moverte · Enter para insertar · Esc para cerrar",
             collections: "Colecciones",
@@ -165,7 +199,7 @@
   margin: 0 !important; position: static !important; background: currentColor !important; pointer-events: none;
   -webkit-mask: var(--plib-icon) center / contain no-repeat !important; mask: var(--plib-icon) center / contain no-repeat !important; }
 .plib-panel .plib-btn.plib-hide, .plib-fallback .plib-btn.plib-hide { display: none !important; }
-.plib-ico-save { --plib-icon: var(--plib-icon-save); } .plib-ico-saveas { --plib-icon: var(--plib-icon-saveas); } .plib-ico-manage { --plib-icon: var(--plib-icon-manage); }
+.plib-ico-save { --plib-icon: var(--plib-icon-save); } .plib-ico-saveas { --plib-icon: var(--plib-icon-saveas); } .plib-ico-manage { --plib-icon: var(--plib-icon-manage); } .plib-ico-history { --plib-icon: var(--plib-icon-history); }
 /* Save highlights (primary look) while WanGP's prompt differs from the loaded prompt */
 .plib-panel .plib-btn.plib-attn { font-weight: 600 !important; background: var(--button-primary-background-fill) !important; color: var(--button-primary-text-color) !important;
   border-color: var(--button-primary-border-color, transparent) !important; }
@@ -250,6 +284,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
 :root { --plib-icon-prompt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5h16v11H9l-5 4V5Z'/%3E%3Cpath d='M8 9h8M8 12h5'/%3E%3C/svg%3E");
   --plib-icon-save: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3h12l4 4v14H3V3h2Zm2 0v7h10V3M7 21v-7h10v7'/%3E%3C/svg%3E");
   --plib-icon-saveas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 21H3V3h12l4 4v5M7 3v6h8V3M7 21v-6h5M18 15v6M15 18h6'/%3E%3C/svg%3E");
+  --plib-icon-history: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 3-6.7L3 8'/%3E%3Cpath d='M3 3v5h5M12 7v5l3 2'/%3E%3C/svg%3E");
   --plib-icon-manage: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1'/%3E%3Ccircle cx='15' cy='6' r='2'/%3E%3Ccircle cx='9' cy='12' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E");
   --plib-icon-tag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12V3h9l9 9-9 9-9-9Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5' fill='black'/%3E%3C/svg%3E"); }
 :root { --plib-icon-pen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4' fill='none' stroke='black' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E"); }
@@ -293,7 +328,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
 .plib-dd-foot { position: sticky; bottom: -4px; margin: 4px -4px -4px; padding: 5px 10px; font-size: 11px; color: var(--plib-subdued);
   background: var(--plib-bg); border-top: 1px solid var(--plib-border); }
 /* ---- toasts (same family as Dragger's, opaque, theme accent) */
-.plib-toasts { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10080;
+.plib-toasts { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10100;
   display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; max-width: min(92vw, 640px); }
 .plib-toast { pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px;
   font: 500 14px/1.35 system-ui, sans-serif; color: #fff; background: var(--color-accent, #2563eb); box-shadow: 0 6px 22px rgba(0,0,0,.35);
@@ -306,6 +341,34 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
 .plib-toast[data-kind="offer"] { background: #1f2937; border: 1px solid var(--color-accent, #2563eb); flex-wrap: wrap; justify-content: center; }
 .plib-toast[data-kind="offer"] button { background: var(--color-accent, #2563eb); }
 .plib-toast[data-kind="offer"] button:hover { filter: brightness(1.12); background: var(--color-accent, #2563eb); }
+/* ---- history dialog (1.3.0) */
+.plib-modal.plib-history { width: min(94vw, 780px); max-height: 86vh; display: flex; flex-direction: column; }
+.plib-hist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.plib-hist-head h3 { margin-bottom: 2px !important; }
+.plib-hist-sub, .plib-hist-count { font-size: 12px; color: var(--plib-subdued); }
+.plib-modal input.plib-hist-q { margin: 10px 0 8px; }
+.plib-hist-list { overflow-y: auto; min-height: 80px; flex: 1 1 auto; border: 1px solid var(--plib-border); border-radius: var(--plib-input-radius, 6px); background: var(--plib-input-bg); }
+.plib-hist-item { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; padding: 9px 12px; border-bottom: 1px solid var(--plib-border); align-items: start; }
+.plib-hist-item:last-child { border-bottom: 0; }
+.plib-hist-item:hover { background: var(--plib-hover, rgba(127,127,127,.08)); }
+.plib-hist-date { font-size: 11.5px; color: var(--plib-subdued); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.plib-hist-text { font-size: 13px; line-height: 1.45; color: var(--plib-fg); white-space: pre-wrap; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.plib-hist-text mark { background: rgba(245,158,11,.35); color: inherit; border-radius: 2px; }
+.plib-hist-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.plib-hist-acts button, .plib-hist-foot button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: var(--plib-btn-radius, 6px); font-size: 12px; font-weight: 600;
+  background: var(--plib-secondary-bg); color: var(--plib-secondary-fg); white-space: nowrap; }
+.plib-hist-acts button.plib-hist-apply { background: var(--plib-accent); color: #fff; }
+.plib-hist-acts button.plib-hist-del { background: transparent; color: var(--plib-subdued); }
+.plib-hist-acts button.plib-hist-del:hover { color: #ef4444; }
+.plib-hist-acts button:hover, .plib-hist-foot button:hover { filter: brightness(1.12); }
+.plib-hist-empty { padding: 22px 12px; text-align: center; font-size: 13px; color: var(--plib-subdued); }
+.plib-hist-foot { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.plib-hist-foot label.plib-hist-toggle { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; font-size: 13px !important; color: var(--plib-fg) !important; cursor: pointer; }
+.plib-hist-foot label.plib-hist-toggle input { width: auto !important; margin: 0; accent-color: var(--plib-accent); }
+.plib-hist-foot .plib-spacer { flex: 1; }
+.plib-hist-foot button.plib-hist-clear { color: #ef4444; background: transparent; border: 1px solid rgba(239,68,68,.5); }
+.plib-hist-foot button.plib-hist-close { background: var(--plib-accent); color: #fff; padding: 6px 14px; font-size: 13px; }
 /* ---- dialogs (template variables, save current) */
 .plib-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 10090; display: flex; align-items: center; justify-content: center; }
 .plib-modal { background: var(--plib-bg); color: var(--plib-fg); border: 1px solid var(--plib-border); border-radius: var(--plib-radius, 8px);
@@ -782,12 +845,13 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         const saveBtn = wrap.querySelector(".plib-save-btn");
         const saveAsBtn = wrap.querySelector(".plib-saveas-btn");
         const manageBtn = wrap.querySelector(".plib-manage-btn");
+        const historyBtn = wrap.querySelector(".plib-history-btn");
         const dd = document.createElement("div");
         dd.className = "plib-dd";
         dd.dataset.tab = tab;
         dd.setAttribute("role", "listbox");
         document.body.appendChild(dd);
-        const state = { tab, wrap, input, box, dd, saveBtn, saveAsBtn, manageBtn, clearBtn, renBtn, activeIdx: -1, results: [] };
+        const state = { tab, wrap, input, box, dd, saveBtn, saveAsBtn, manageBtn, historyBtn, clearBtn, renBtn, activeIdx: -1, results: [] };
         mounts.set(tab, state);
         relabel(state);
         const syncClear = () => clearBtn.classList.toggle("show", !!input.value && !state.showingCurrent && !state.renaming);
@@ -826,6 +890,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         if (saveBtn) saveBtn.addEventListener("click", () => onSave(tab));
         if (saveAsBtn) saveAsBtn.addEventListener("click", () => onSaveAs(tab));
         if (manageBtn) manageBtn.addEventListener("click", openManageTab);
+        if (historyBtn) historyBtn.addEventListener("click", () => openHistory(tab));
         dd.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the input
         syncClear();
         updateBar(tab, true);
@@ -918,6 +983,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         state.statusHtml = null; state.metaSig = null;
         updateBar(state.tab, true);
         if (state.manageBtn) { state.manageBtn.textContent = t("manage"); state.manageBtn.title = t("open_tab"); }
+        if (state.historyBtn) { state.historyBtn.textContent = t("history"); state.historyBtn.title = t("history_title"); }
         state.clearBtn && (state.clearBtn.title = t("clear"));
     }
     function openDropdown(state) {
@@ -1482,7 +1548,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
                     labelOf: (v) => (collById.get(v) || {}).name || v, emptyText: t("no_suggestions") });
                 modal.appendChild(collEd.el);
             }
-            lab(t("text_label"));
+            lab(init.textLabel || t("text_label"));
             const pre = document.createElement("div");
             pre.className = "plib-saveas-text";
             pre.textContent = init.text.length > 400 ? init.text.slice(0, 400) + "…" : init.text;
@@ -1499,6 +1565,134 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); ok.click(); } });
             modal.addEventListener("keydown", (e) => { if (e.key === "Escape") done(null); });
         });
+    }
+    // ---- History (1.3.0): prompts recorded when Generate / Add to queue is clicked (history.json, server side)
+    function recordHistory(tab) {
+        if (cfg.history === false) return;
+        const text = readPromptValue(tab);
+        if (!String(text || "").trim()) return;
+        sendBridge({ action: "history_add", tab, text }).catch(() => {});
+    }
+    function histMatch(entry, words) {
+        if (!words.length) return true;
+        const hay = fold(entry.text);
+        return words.every(w => hay.includes(w));
+    }
+    function histHighlight(text, words) {
+        const src = String(text || "");
+        if (!words.length) return escapeHtml(src);
+        // Highlight on the folded copy (same length per char after NFD stripping is not guaranteed): map char by char.
+        const folded = [...src].map(ch => fold(ch));
+        const flat = folded.join("");
+        const marks = new Array(src.length).fill(false);
+        const chars = [...src];
+        const starts = []; let acc = 0; folded.forEach(f => { starts.push(acc); acc += f.length; });
+        for (const w of words) {
+            let i = flat.indexOf(w);
+            while (i !== -1) {
+                for (let k = 0; k < chars.length; k++) if (starts[k] < i + w.length && starts[k] + Math.max(1, folded[k].length) > i) marks[k] = true;
+                i = flat.indexOf(w, i + w.length);
+            }
+        }
+        let out = "", open = false;
+        chars.forEach((ch, k) => {
+            if (marks[k] && !open) { out += "<mark>"; open = true; }
+            if (!marks[k] && open) { out += "</mark>"; open = false; }
+            out += escapeHtml(ch);
+        });
+        return out + (open ? "</mark>" : "");
+    }
+    function histDate(ts) {
+        try { return new Date(ts * 1000).toLocaleString(lang() === "es" ? "es-ES" : "en-GB", { dateStyle: "medium", timeStyle: "short" }); }
+        catch (_) { return ""; }
+    }
+    async function openHistory(tab) {
+        if (document.querySelector(".plib-modal.plib-history")) return;
+        const { bg, modal } = modalShell("plib-history");
+        modal.innerHTML = `<div class="plib-hist-head"><div><h3>${escapeHtml(t("history"))}</h3><div class="plib-hist-sub">${escapeHtml(t("history_title"))}</div></div>`
+            + `<span class="plib-hist-count"></span></div>`;
+        const q = document.createElement("input");
+        q.className = "plib-hist-q"; q.placeholder = t("hist_search_ph"); q.type = "search";
+        const list = document.createElement("div"); list.className = "plib-hist-list";
+        const foot = document.createElement("div"); foot.className = "plib-hist-foot";
+        foot.innerHTML = `<label class="plib-hist-toggle"><input type="checkbox" class="plib-hist-enabled"> ${escapeHtml(t("hist_enabled"))}</label>`
+            + `<span class="plib-spacer"></span><button class="plib-hist-clear">${escapeHtml(t("hist_clear"))}</button>`
+            + `<button class="plib-hist-close">${escapeHtml(t("close"))}</button>`;
+        modal.append(q, list, foot);
+        const count = modal.querySelector(".plib-hist-count");
+        const toggle = foot.querySelector(".plib-hist-enabled");
+        let entries = [], enabled = cfg.history !== false;
+        const render = () => {
+            const words = fold(q.value).split(/\s+/).filter(Boolean);
+            const shown = entries.filter(e => histMatch(e, words));
+            toggle.checked = enabled;
+            count.textContent = words.length ? t("hist_count", { n: shown.length, total: entries.length }) : String(entries.length || "");
+            foot.querySelector(".plib-hist-clear").disabled = !entries.length;
+            foot.querySelector(".plib-hist-clear").style.opacity = entries.length ? "" : ".45";
+            list.innerHTML = "";
+            if (!shown.length) {
+                const empty = document.createElement("div"); empty.className = "plib-hist-empty";
+                empty.textContent = entries.length ? t("hist_no_match") : (enabled ? t("hist_empty") : t("hist_off_note"));
+                list.appendChild(empty);
+                return;
+            }
+            for (const e of shown.slice(0, 200)) {
+                const row = document.createElement("div"); row.className = "plib-hist-item"; row.dataset.hid = e.id;
+                row.innerHTML = `<div><div class="plib-hist-date">${escapeHtml(histDate(e.ts))}</div>`
+                    + `<div class="plib-hist-text" title="${escapeHtml(e.text)}">${histHighlight(e.text, words)}</div></div>`
+                    + `<div class="plib-hist-acts"><button class="plib-hist-apply" title="${escapeHtml(t("hist_apply_title"))}">${escapeHtml(t("hist_apply"))}</button>`
+                    + `<button class="plib-hist-save">${escapeHtml(t("hist_save"))}</button>`
+                    + `<button class="plib-hist-del" title="${escapeHtml(t("hist_delete"))}">${escapeHtml(t("hist_delete"))}</button></div>`;
+                row.querySelector(".plib-hist-apply").addEventListener("click", () => applyHistory(e));
+                row.querySelector(".plib-hist-save").addEventListener("click", () => saveHistory(e));
+                row.querySelector(".plib-hist-del").addEventListener("click", () => call({ action: "history_delete", hid: e.id }));
+                list.appendChild(row);
+            }
+        };
+        const call = async (req) => {
+            try {
+                const r = await sendBridge(Object.assign({ tab }, req));
+                if (r && r.ok && Array.isArray(r.history)) { entries = r.history; enabled = r.enabled !== false; cfg.history = enabled; }
+                render();
+                return r;
+            } catch (err) { toast(String(err.message || err), "error"); return null; }
+        };
+        const close = () => { bg.remove(); document.removeEventListener("keydown", onEsc, true); };
+        const onEsc = (ev) => {
+            if (ev.key !== "Escape" || document.querySelector(".plib-modal-bg:not(.plib-hist-bg) .plib-modal")) return;
+            if (q.value) { q.value = ""; render(); } else close();
+            ev.stopPropagation();
+        };
+        async function applyHistory(e) {
+            try {
+                const r = await sendBridge({ action: "insert", tab, field: fieldOf(visiblePromptRoot(tab)), text: e.text, title: t("hist_entry"),
+                    mode: "replace", current: readPromptValue(tab) });
+                if (r && r.ok) { setCurrent(tab, null); close(); }
+            } catch (err) { toast(String(err.message || err), "error"); }
+        }
+        async function saveHistory(e) {
+            const res = await askSaveAs({ title: e.text.split("\n")[0].slice(0, 60), tags: [], colls: [], text: e.text, textLabel: t("hist_text_label") });
+            if (!res) return;
+            try {
+                const r = await sendBridge({ action: "save_as", tab, text: e.text, title: res.title, tags: res.tags, collections: collections ? res.colls : undefined });
+                if (r && r.ok && r.item && normText(readPromptValue(tab)) === normText(e.text)) setCurrent(tab, { id: r.item.id, rendered: null });
+            } catch (err) { toast(String(err.message || err), "error"); }
+        }
+        bg.classList.add("plib-hist-bg");
+        q.addEventListener("input", render);
+        toggle.addEventListener("change", () => call({ action: "history_enable", enabled: toggle.checked }));
+        foot.querySelector(".plib-hist-clear").addEventListener("click", async () => {
+            if (!entries.length) return;
+            if (await askConfirm(t("hist_clear_confirm", { n: entries.length }), t("hist_clear"))) call({ action: "history_clear" });
+        });
+        foot.querySelector(".plib-hist-close").addEventListener("click", close);
+        bg.addEventListener("mousedown", (ev) => { if (ev.target === bg) close(); });
+        document.addEventListener("keydown", onEsc, true);
+        applyTheme(modal);
+        document.body.appendChild(bg);
+        render();
+        q.focus();
+        await call({ action: "history_list" });
     }
     function openManageTab() {
         // Click a VISIBLE main-tabs button labelled "Prompt Library" (Gradio may render duplicates).
@@ -1602,6 +1796,12 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             const b = document.getElementById("plib_poll");
             if (b) b.click();
         }, 3000);
+        // History: record the visible prompt when WanGP's Generate / Add to queue buttons are clicked (capture phase,
+        // before Gradio handles the click; the buttons get the plib-gen-btn class from plugin.py).
+        document.addEventListener("click", (e) => {
+            const b = e.target && e.target.closest && e.target.closest(".plib-gen-btn");
+            if (b) recordHistory(activeTab());
+        }, true);
         // Typing in WanGP's prompt: refresh the "modificado" indicator right away (debounced) instead of waiting for the poll.
         let typeT = null;
         document.addEventListener("input", (e) => {

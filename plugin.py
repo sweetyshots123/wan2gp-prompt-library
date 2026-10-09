@@ -34,7 +34,7 @@ from shared.utils.plugins import WAN2GPPlugin
 
 from . import storage
 
-PLUGIN_VERSION = "1.2.1"
+PLUGIN_VERSION = "1.3.0"
 _PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
 SETTINGS_PATH = os.path.join(_PLUGIN_DIR, "settings.json")
 
@@ -113,6 +113,12 @@ TEXT = {
         "tag_same": "Nothing to rename",
         "prompt_renamed": "Prompt renamed to “{title}”",
         "need_title": "The title cannot be empty",
+        "bar_history": "History",
+        "hist_entry": "History prompt",
+        "hist_cleared": "History cleared ({n} entries)",
+        "hist_cleared_1": "History cleared (1 entry)",
+        "hist_off": "History turned off: new prompts will not be recorded",
+        "hist_on": "History turned on",
         "prompt_1": "prompt", "prompt_n": "prompts",
         "mgr_tags_sec": "### Tags",
         "mgr_tag_old": "Tag",
@@ -205,6 +211,12 @@ TEXT = {
         "tag_same": "Nada que renombrar",
         "prompt_renamed": "Prompt renombrado a «{title}»",
         "need_title": "El título no puede estar vacío",
+        "bar_history": "Historial",
+        "hist_entry": "Prompt del historial",
+        "hist_cleared": "Historial vaciado ({n} entradas)",
+        "hist_cleared_1": "Historial vaciado (1 entrada)",
+        "hist_off": "Historial desactivado: no se guardarán nuevos prompts",
+        "hist_on": "Historial activado",
         "prompt_1": "prompt", "prompt_n": "prompts",
         "mgr_tags_sec": "### Etiquetas",
         "mgr_tag_old": "Etiqueta",
@@ -439,6 +451,7 @@ DEFAULT_SETTINGS = {
     "toast_ms": 3500,
     "undo": True,
     "save_current_button": True,
+    "history": True,                 # record the prompts used to generate (history.json)
     "on_pick_collection": "offer",   # none | offer | auto   (prompt picked -> its Reference Library collection)
     "on_reflib_applied": "none",     # none | offer          (collection loaded -> its prompts; RL already offers)
 }
@@ -545,6 +558,8 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         self.request_component("prompt")
         self.request_component("wizard_prompt")
         self.request_component("tab_id")
+        self.request_component("generate_btn")      # history: tagged with a class, recorded on click (prompt_library.js)
+        self.request_component("add_to_queue_btn")
         self.request_component("prompt_column_wizard")  # anchor: the search bar goes right after the prompt box
         register_api()
         self.add_custom_js(build_js())
@@ -562,6 +577,13 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         # The search bar is made of real Gradio components (themed like the rest of WanGP), inserted right after the
         # prompt column (visible in both the basic "wizard" and the advanced prompt modes). prompt_library.js
         # wires the autocomplete to it; if the insertion is not possible it falls back to a DOM-only bar.
+        # History: tag WanGP's Generate / Add-to-queue buttons with a class (no core change, no extra event); the page
+        # records the visible prompt when they are clicked.
+        for key in ("generate_btn", "add_to_queue_btn"):
+            btn = components.get(key)
+            if btn is not None:
+                classes = list(btn.elem_classes or []) if isinstance(btn.elem_classes, (list, tuple)) else ([btn.elem_classes] if btn.elem_classes else [])
+                btn.elem_classes = classes + ["plib-gen-btn"]
         if components.get("prompt_column_wizard") is not None:
             self.insert_after("prompt_column_wizard", lambda t=tab: self.create_bar(t))
         return {}
@@ -584,6 +606,8 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                               elem_id=f"plib_save_{tab}", elem_classes=["plib-btn", "plib-ico-save", "plib-save-btn"])
                     gr.Button(tr(lang, "bar_save_as"), size="lg", scale=0, min_width=0,
                               elem_id=f"plib_saveas_{tab}", elem_classes=["plib-btn", "plib-ico-saveas", "plib-saveas-btn"])
+                    gr.Button(tr(lang, "bar_history"), size="lg", scale=0, min_width=0,
+                              elem_id=f"plib_history_{tab}", elem_classes=["plib-btn", "plib-ico-history", "plib-history-btn"])
                     gr.Button(tr(lang, "bar_manage"), size="lg", scale=0, min_width=0,
                               elem_id=f"plib_manage_{tab}", elem_classes=["plib-btn", "plib-ico-manage", "plib-manage-btn"])
             # Tags / Reference Library collections of the current prompt (inline editors, hidden when none is loaded).
@@ -1143,6 +1167,8 @@ class PromptLibraryPlugin(WAN2GPPlugin):
                 return self._action_rename_tag(tab, req, prompt_val, wizard_val, lang)
             if action == "undo_save":
                 return self._action_undo_save(tab, req, prompt_val, wizard_val, lang)
+            if action.startswith("history_"):
+                return self._action_history(tab, action, req, prompt_val, wizard_val, lang)
             if action == "mark_used":
                 pid = req.get("id")
                 storage.mark_used(pid)
@@ -1158,6 +1184,29 @@ class PromptLibraryPlugin(WAN2GPPlugin):
         except Exception as e:
             traceback.print_exc()
             return self._pack(tab, {"ok": False, "error": str(e)}, prompt_val, wizard_val, None, None)
+
+    def _action_history(self, tab, action, req, prompt_val, wizard_val, lang):
+        settings = load_settings()
+        resp = {"ok": True, "id": req.get("req_id")}
+        if action == "history_add":
+            entry = storage.add_history(req.get("text") or "", tab) if settings.get("history", True) else None
+            resp["recorded"] = entry is not None
+            return self._pack(tab, resp, prompt_val, wizard_val, None, None)
+        if action == "history_delete":
+            resp["deleted"] = storage.delete_history(str(req.get("hid") or ""))
+        elif action == "history_clear":
+            n = storage.clear_history()
+            resp["toast"] = tr(lang, "hist_cleared_1" if n == 1 else "hist_cleared", n=n)
+        elif action == "history_enable":
+            settings["history"] = bool(req.get("enabled"))
+            save_settings(settings)
+            resp["toast"] = tr(lang, "hist_on" if settings["history"] else "hist_off")
+            resp["settings"] = settings
+        elif action != "history_list":
+            return self._pack(tab, {"ok": False, "error": tr(lang, "unknown_action")}, prompt_val, wizard_val, None, None)
+        resp["history"] = storage.load_history()
+        resp["enabled"] = bool(settings.get("history", True))
+        return self._pack(tab, resp, prompt_val, wizard_val, None, None)
 
     @staticmethod
     def _lib_resp():

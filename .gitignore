@@ -4,3 +4,5 @@ library.json
 library.json.tmp
 __pycache__/
 *.pyc
+history.json
+history.json.tmp

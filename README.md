@@ -47,6 +47,18 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 **Starter examples**
 - The first run creates three prompts titled `[Example] …`. Delete them whenever you like; they are only seeds.
 
+## Prompt history (1.3.0)
+
+Every prompt you actually use is recorded: when you click WanGP's **Generate** (or **Add New Prompt To Queue**), the text in the visible prompt box goes to the history.
+- Open it with **History** in the bar. Entries are newest first, each with its date. Search uses the same accent- and case-insensitive multi-word matching as the bar, and matches are highlighted.
+- Each entry has three actions:
+  - **Apply** loads it into WanGP's prompt.
+  - **Save to library** opens the usual *Save as…* dialog, prefilled.
+  - **Delete** removes it.
+- **Clear history** empties it after a confirmation. The **Record history** checkbox in the dialog turns recording off (saved in `settings.json`).
+- Repeating the same prompt in a row doesn't add a duplicate, it only refreshes the date. The last 500 entries are kept.
+- Stored in `history.json`, separate from the library.
+
 ## Reference Library collections (1.1.0)
 
 If [Reference Library](https://github.com/sweetyshots123/wan2gp-reference-library) **1.1 or newer** is installed, prompts and image collections can be linked to each other:
@@ -122,8 +134,9 @@ Inside the plugin folder (next to `plugin.py`):
 
 - `library.json` — your prompts and their links to Reference Library collections (created on first use, with 3 example entries).
 - `settings.json` — your settings (created when you save).
+- `history.json` — the prompt history (1.3.0; created on the first Generate).
 
-Both are excluded from the zip and from git.
+None of them are in the zip or in git, so updating the plugin keeps them.
 
 ## License
 
