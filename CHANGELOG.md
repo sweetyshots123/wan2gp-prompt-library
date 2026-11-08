@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0 — 2026-10-18
+
+- **Natural-language description per prompt (optional).** Each prompt can carry a plain description of the idea next to its model-specific text (for example the H3-tuned prompt). It is model-agnostic and never sent to the model unless you ask.
+  - **Bar:** a **Natural** row under the tags and collections. Click the preview (or *+ description*) to edit inline; Esc collapses it. Edits count as *modified*, and **Update** / **Save as…** save them. **Copy to prompt** puts the description in WanGP's prompt; **Apply** always loads the model prompt.
+  - **Save as…** (also from the history) has a *Natural-language description (optional)* field. The manager has the same field.
+  - **Search** also matches the description. A hit found only there is marked *in the natural description*, with a snippet.
+  - Stored as `natural` in `library.json`. Older files load unchanged (empty description). The Python API `list_prompts()` / `get_prompt()` include `natural`; `API_VERSION` stays 1.
+- **Bar uniform with Reference Library 1.6.3.** Same buttons, order, wording, icons and tooltip pattern: **Apply** (primary, ✓) · **Save as…** (floppy) · **Update** (refresh, overwrites the loaded prompt; it was *Save*) · **Manage** (sliders). **History** is now a 36 px icon-only square at the end of the row, like Reference Library's history button.
+  - **Apply** reloads the loaded prompt into WanGP's prompt (discarding unsaved edits there). With nothing loaded it says so and focuses the search box.
+  - The search box stays search-only. Renaming the loaded prompt with the pencil inside the box or by double-click is kept, because Reference Library renames its collection the same way in its selector.
+- Dark and light themes, EN/ES.
+
 ## 1.3.0 — 2026-10-09
 
 - **Prompt history.** The prompt in the visible box is recorded when WanGP's **Generate** or **Add New Prompt To Queue** is clicked.

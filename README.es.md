@@ -16,7 +16,7 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 ## Funciones
 
 **Búsqueda con autocompletado**
-- Una barra **Prompt Library** justo bajo el prompt principal de WanGP (y en la pestaña **Editar** de la cola si está activado). Sigue el mismo estilo que la barra de Reference Library: cabecera con icono y estado a la derecha, el campo de búsqueda (texto de ayuda + borrar ×) y los botones **Guardar**, **Guardar como…** y **Gestionar**. Está hecha con componentes Gradio normales, así que sigue los **temas oscuro y claro** de WanGP.
+- Una barra **Prompt Library** justo bajo el prompt principal de WanGP (y en la pestaña **Editar** de la cola si está activado). Sigue el mismo estilo que la barra de Reference Library: cabecera con icono y estado a la derecha, el campo de búsqueda (texto de ayuda + borrar ×) y los mismos botones que la barra de Reference Library: **Aplicar**, **Guardar como…**, **Actualizar** y **Gestionar**, más un cuadrado **Historial** solo con icono. Está hecha con componentes Gradio normales, así que sigue los **temas oscuro y claro** de WanGP.
 - Varias palabras = **AND**: todas tienen que aparecer en el título, las etiquetas o el texto.
 - Sin distinguir mayúsculas ni **acentos** (`cancion` encuentra `canción`). Valen coincidencias parciales.
 - Orden: primero coincidencias en el título, luego etiquetas, luego el cuerpo; después por uso reciente / frecuente.
@@ -29,9 +29,10 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 - Aviso opcional de **Deshacer** unos segundos después de insertar.
 - Variables simples como `{subject}` abren un diálogo para rellenarlas antes de insertar.
 
-**Prompt actual, Guardar y Guardar como… (1.2.0)**
+**Prompt actual, Aplicar, Actualizar y Guardar como… (1.2.0, renombrados en 1.4.0)**
 - La barra recuerda el prompt que cargaste, tanto si lo elegiste en el autocompletado como si lo aplicó otro plugin (`promptlib:apply`, p. ej. un chip de Reference Library). Se guarda por sesión del navegador y por pestaña (Generar / Editar). La cabecera muestra **Prompt «X» cargado**, y una marca de **modificado** mientras el prompt de WanGP sea distinto del texto guardado. En una plantilla, se compara con los valores que rellenaste.
-- **Guardar** sobrescribe el prompt cargado con el texto actual de WanGP. El aviso trae **Deshacer**. Si no hay ninguno cargado, Guardar funciona como *Guardar como…*. Si no hay cambios, solo lo indica. Si guardas encima de una plantilla y sus `{variables}` ya no están en el texto, pregunta antes.
+- **Aplicar** vuelve a cargar el prompt actual en el prompt de WanGP (descarta los cambios sin guardar allí).
+- **Actualizar** (antes de 1.4.0 se llamaba *Guardar*) sobrescribe el prompt cargado con el texto actual de WanGP. El aviso trae **Deshacer**. Si no hay ninguno cargado, Actualizar funciona como *Guardar como…*. Si no hay cambios, solo lo indica. Si guardas encima de una plantilla y sus `{variables}` ya no están en el texto, pregunta antes.
 - **Guardar como…** crea un prompt **nuevo** con el texto actual y deja el cargado sin cambios. Su diálogo tiene el título (con «X (copia)» ya escrito), las etiquetas y las colecciones de Reference Library del cargado como punto de partida, y una vista previa del texto. El nuevo pasa a ser el actual. **Deshacer** en el aviso lo borra de nuevo.
 - **Detalles en línea:** bajo la barra, las **etiquetas** del prompt actual aparecen como chips con × y un campo «+ etiqueta» que autocompleta con tus etiquetas existentes. Si está Reference Library 1.1+, sus **colecciones** tienen el mismo editor, con un selector limitado a las colecciones existentes. Los cambios se guardan al momento y el aviso trae **Deshacer**. El diálogo *Guardar como…* usa los mismos editores de chips, pero ahí no se guarda nada hasta que confirmas.
 - **El cuadro de búsqueda muestra el prompt cargado (1.2.1):** en reposo, muestra el título del prompt cargado como valor. Al enfocarlo, el título queda seleccionado y al escribir se busca como siempre; Esc o hacer clic fuera sin elegir nada recupera el título. Para **renombrarlo**, usa el pequeño lápiz dentro del cuadro (junto a la ×) o haz doble clic en el cuadro. El cuadro se vuelve ámbar y muestra *Renombrar prompt…* sin desplegable. Enter guarda, Esc cancela, y un título vacío se rechaza. Renombra **ese** prompt: mismo id, con el texto, las etiquetas y las colecciones intactos. El aviso trae **Deshacer**, y el gestor, el autocompletado y los chips de Reference Library se refrescan. En el estado, los títulos largos se recortan con puntos suspensivos.
@@ -47,10 +48,19 @@ Es un plugin normal de WanGP. No modifica ningún archivo del núcleo, así que 
 **Ejemplos iniciales**
 - La primera vez se crean tres prompts con título `[Example] …`. Bórralos cuando quieras; solo sirven de semilla.
 
+## Descripción en lenguaje natural (1.4.0)
+
+Cada prompt puede guardar, opcionalmente, una descripción de la idea con tus palabras junto a su texto adaptado al modelo. Por ejemplo, «una mujer camina bajo la lluvia de neón, de noche, melancólica» junto al prompt preparado para H3. No depende de ningún modelo.
+
+- **Barra:** la fila **Natural**, bajo las etiquetas, muestra un avance o *+ descripción*. Haz clic para editarla ahí mismo. Al editarla, el prompt queda *modificado*; **Actualizar** o **Guardar como…** la guardan, y Esc cierra el editor. **Copiar al prompt** pone la descripción en el prompt de WanGP. **Aplicar** siempre carga el prompt del modelo, nunca la descripción.
+- **Guardar como…** (también al guardar desde el historial) y el **gestor** tienen el campo *Descripción en lenguaje natural (opcional)*.
+- La **búsqueda** también mira la descripción. Si un resultado solo coincide ahí, lleva la marca *en la descripción natural* y un fragmento.
+- Se guarda como `natural` en `library.json`. Las bibliotecas antiguas cargan igual, y `list_prompts()` / `get_prompt()` la incluyen.
+
 ## Historial de prompts (1.3.0)
 
 Se guarda cada prompt que usas de verdad: al pulsar **Generate** (o **Add New Prompt To Queue**) en WanGP, el texto del cuadro de prompt visible pasa al historial.
-- Ábrelo con **Historial** en la barra. Las entradas van de la más reciente a la más antigua, cada una con su fecha. La búsqueda usa la misma coincidencia de varias palabras sin distinguir acentos ni mayúsculas que la barra, y resalta lo encontrado.
+- Ábrelo con el icono **Historial** (el cuadrado al final de los botones de la barra). Las entradas van de la más reciente a la más antigua, cada una con su fecha. La búsqueda usa la misma coincidencia de varias palabras sin distinguir acentos ni mayúsculas que la barra, y resalta lo encontrado.
 - Cada entrada tiene tres acciones:
   - **Aplicar** la carga en el prompt de WanGP.
   - **Guardar en biblioteca** abre el diálogo *Guardar como…* de siempre, ya relleno.
@@ -78,7 +88,7 @@ Si tienes [Reference Library](https://github.com/sweetyshots123/wan2gp-reference
 
 Los vínculos solo viven en `library.json` de Prompt Library (`collections: [id de colección, …]` por prompt; esquema 2). Los archivos antiguos de 1.0.x se migran solos.
 
-**Python:** `sys.modules["wan2gp_prompt_library_api"]`, `API_VERSION = 1`: `list_prompts()`, `prompts_for_collection(cid)`, `set_collection_prompts(cid, prompt_ids)`, `collections_for_prompt(pid)`, `set_prompt_collections(pid, cids)`, `get_prompt(pid)`, `revision()` y, desde 1.2.1, `rename_tag(old, new)`. Todas las escrituras son seguras entre hilos y se guardan de forma atómica. Consulta la tabla del README en inglés.
+**Python:** `sys.modules["wan2gp_prompt_library_api"]`, `API_VERSION = 1`: `list_prompts()`, `prompts_for_collection(cid)`, `set_collection_prompts(cid, prompt_ids)`, `collections_for_prompt(pid)`, `set_prompt_collections(pid, cids)`, `get_prompt(pid)`, `revision()` y, desde 1.2.1, `rename_tag(old, new)`. Desde 1.4.0, `list_prompts()` y `get_prompt()` incluyen `natural`. Todas las escrituras son seguras entre hilos y se guardan de forma atómica. Consulta la tabla del README en inglés.
 
 **Eventos JS:**
 
@@ -100,7 +110,7 @@ Los vínculos solo viven en `library.json` de Prompt Library (`collections: [id 
 | Language / Idioma | *Auto (idioma del navegador)*, *English* o *Español* | Auto |
 | Mostrar el cuadro de búsqueda junto al prompt | interruptor maestro de la UI | sí |
 | Mostrarlo también en la pestaña Editar de la cola | montar la búsqueda también en Editar | sí |
-| Botones «Guardar» / «Guardar como…» en la barra | muestra los dos botones de guardar | sí |
+| Botones «Actualizar» / «Guardar como…» en la barra | muestra los dos botones de guardar | sí |
 | Cómo insertar | *Reemplazar* / *Añadir al final* / *Insertar en el cursor* | Reemplazar |
 | Ofrecer «Deshacer» tras insertar | aviso de deshacer | sí |
 | Mensajes de confirmación + Duración | avisos (los errores siempre se muestran) | sí, 3,5 s |

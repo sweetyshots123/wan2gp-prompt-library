@@ -23,8 +23,27 @@
             not_ready: "the plugin is not ready (reload the page)",
             no_response: "no response from the server",
             empty_prompt: "the prompt box is empty",
-            open_tab: "Open Prompt Library tab",
+            open_tab: "Open the Prompt Library tab",
             manage: "Manage",
+            apply: "Apply",
+            update: "Update",
+            tip_search: "Search the library; the prompt you pick is loaded into WanGP's prompt",
+            tip_apply: "Load the current prompt into WanGP's prompt again (discards unsaved edits there)",
+            tip_apply_none: "Pick a prompt in the search box first",
+            tip_save_as: "Save WanGP's current prompt as a new prompt",
+            tip_update: "Overwrite “{title}” with WanGP's current prompt",
+            tip_update_none: "No prompt loaded: save WanGP's current prompt as a new one",
+            apply_none: "No prompt loaded: pick one in the search box",
+            natural: "Natural",
+            natural_title: "Natural-language description: the idea in your own words, not adapted to the model (never applied to WanGP)",
+            natural_add: "+ description",
+            natural_ph: "Describe the idea in your own words…",
+            natural_copy: "Copy to prompt",
+            natural_copy_title: "Replace WanGP's prompt with this natural-language text",
+            natural_label: "Natural-language description (optional)",
+            natural_hit: "in the natural description",
+            natural_entry: "Natural description",
+            natural_empty: "the natural description is empty",
             history: "History",
             history_title: "Prompts used to generate (newest first)",
             hist_search_ph: "Search the history…",
@@ -90,8 +109,27 @@
             not_ready: "el plugin no está listo (recarga la página)",
             no_response: "sin respuesta del servidor",
             empty_prompt: "el cuadro de prompt está vacío",
-            open_tab: "Abrir pestaña Prompt Library",
+            open_tab: "Abrir la pestaña Prompt Library",
             manage: "Gestionar",
+            apply: "Aplicar",
+            update: "Actualizar",
+            tip_search: "Buscar en la biblioteca; el prompt que elijas se carga en el prompt de WanGP",
+            tip_apply: "Volver a cargar el prompt actual en el prompt de WanGP (descarta los cambios sin guardar allí)",
+            tip_apply_none: "Elige primero un prompt en el buscador",
+            tip_save_as: "Guardar el prompt actual de WanGP como un prompt nuevo",
+            tip_update: "Sobrescribir «{title}» con el prompt actual de WanGP",
+            tip_update_none: "No hay ningún prompt cargado: guardar el prompt actual de WanGP como uno nuevo",
+            apply_none: "No hay ningún prompt cargado: elige uno en el buscador",
+            natural: "Natural",
+            natural_title: "Descripción en lenguaje natural: la idea en tus palabras, sin adaptar al modelo (nunca se aplica a WanGP)",
+            natural_add: "+ descripción",
+            natural_ph: "Describe la idea con tus palabras…",
+            natural_copy: "Copiar al prompt",
+            natural_copy_title: "Reemplazar el prompt de WanGP por este texto en lenguaje natural",
+            natural_label: "Descripción en lenguaje natural (opcional)",
+            natural_hit: "en la descripción natural",
+            natural_entry: "Descripción natural",
+            natural_empty: "la descripción natural está vacía",
             history: "Historial",
             history_title: "Prompts usados para generar (los más recientes primero)",
             hist_search_ph: "Buscar en el historial…",
@@ -199,7 +237,7 @@
   margin: 0 !important; position: static !important; background: currentColor !important; pointer-events: none;
   -webkit-mask: var(--plib-icon) center / contain no-repeat !important; mask: var(--plib-icon) center / contain no-repeat !important; }
 .plib-panel .plib-btn.plib-hide, .plib-fallback .plib-btn.plib-hide { display: none !important; }
-.plib-ico-save { --plib-icon: var(--plib-icon-save); } .plib-ico-saveas { --plib-icon: var(--plib-icon-saveas); } .plib-ico-manage { --plib-icon: var(--plib-icon-manage); } .plib-ico-history { --plib-icon: var(--plib-icon-history); }
+.plib-ico-apply { --plib-icon: var(--plib-icon-apply); } .plib-ico-save { --plib-icon: var(--plib-icon-rlsave); } .plib-ico-refresh { --plib-icon: var(--plib-icon-refresh); } .plib-ico-manage { --plib-icon: var(--plib-icon-manage); } .plib-ico-history { --plib-icon: var(--plib-icon-history); }
 /* Save highlights (primary look) while WanGP's prompt differs from the loaded prompt */
 .plib-panel .plib-btn.plib-attn { font-weight: 600 !important; background: var(--button-primary-background-fill) !important; color: var(--button-primary-text-color) !important;
   border-color: var(--button-primary-border-color, transparent) !important; }
@@ -209,10 +247,45 @@
   font-size: var(--text-md, 14px) !important; line-height: 20px !important; padding-top: 8px !important; padding-bottom: 6px !important; overflow: hidden !important; }
 .plib-panel .plib-ctl:is(.block) :is(input, textarea):focus { box-shadow: inset 0 0 0 1px var(--plib-acc), 0 0 0 1px var(--plib-acc) !important; }
 .plib-panel .plib-ctl label { margin: 0 !important; }
+.plib-panel .plib-btn.primary { font-weight: 600 !important; }
+/* Historial mirrors RL 1.6.3's history button: a 36px icon-only square at the end of the row */
+:is(.plib-panel, .plib-fallback) .plib-btn.plib-history-btn { flex: 0 0 36px !important; width: 36px !important; min-width: 36px !important; max-width: 36px !important;
+  padding: 0 !important; gap: 0 !important; font-size: 0 !important; justify-content: center !important; }
+:is(.plib-panel, .plib-fallback) .plib-btn.plib-history-btn::before { flex: 0 0 18px !important; width: 18px !important; height: 18px !important; }
+@container plib-panel (max-width: 640px) {
+  .plib-panel .plib-row > .plib-btns { flex-wrap: wrap !important; flex-basis: 100% !important; margin-left: 0 !important; }
+}
 @container plib-panel (max-width: 430px) {
   .plib-panel .plib-row > .plib-btns { flex-wrap: wrap !important; flex-basis: 100% !important; margin-left: 0 !important; }
   .plib-panel .plib-row > .plib-btns > .plib-btn { flex: 1 1 calc(33% - 4px) !important; }
 }
+/* natural-language description of the loaded prompt (1.4.0) */
+.plib-meta-group[data-kind="natural"] { flex: 1 1 100%; align-items: flex-start; }
+.plib-meta-group[data-kind="natural"] .plib-meta-label { padding-top: 5px; }
+.plib-nat { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.plib-nat-toggle { all: unset; cursor: pointer; box-sizing: border-box; max-width: 100%; min-height: 26px; padding: 4px 10px; border-radius: 13px;
+  font-size: var(--text-sm, 12px); line-height: 18px; color: var(--plib-fg, var(--body-text-color)); background: var(--plib-chip-bg, rgba(127,127,127,.12));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plib-nat-toggle.plib-nat-empty { color: var(--plib-subdued, var(--body-text-color-subdued)); background: transparent; box-shadow: inset 0 0 0 1px var(--plib-bd, var(--border-color-primary)); }
+.plib-nat-toggle:hover { filter: brightness(1.12); }
+.plib-nat-toggle:focus-visible { box-shadow: 0 0 0 2px var(--plib-acc); }
+.plib-nat.open .plib-nat-toggle { display: none; }
+.plib-nat-edit { display: none; flex-direction: column; gap: 6px; }
+.plib-nat.open .plib-nat-edit { display: flex; }
+.plib-panel textarea.plib-nat-ta, textarea.plib-nat-ta { width: 100%; box-sizing: border-box; min-height: 64px; resize: vertical; padding: 7px 10px; border: 0; border-radius: 5px; outline: none;
+  font: inherit; font-size: var(--text-md, 14px); line-height: 1.45; color: var(--body-text-color) !important; background: var(--plib-input, var(--input-background-fill)) !important;
+  box-shadow: inset 0 0 0 1px var(--plib-bd, var(--border-color-primary)) !important; }
+.plib-panel textarea.plib-nat-ta:focus, textarea.plib-nat-ta:focus { box-shadow: inset 0 0 0 1px var(--plib-acc), 0 0 0 1px var(--plib-acc); }
+.plib-nat-acts { display: flex; gap: 6px; justify-content: flex-end; }
+.plib-nat-acts button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 6px; font-size: var(--text-sm, 12px); font-weight: 600;
+  background: var(--button-secondary-background-fill); color: var(--button-secondary-text-color); }
+.plib-nat-acts button:hover { background: var(--button-secondary-background-fill-hover, var(--button-secondary-background-fill)); }
+.plib-item-nat { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; line-height: 16px;
+  color: #b45309; background: rgba(245,158,11,.16); }
+.dark .plib-item-nat { color: #fbbf24; }
+.plib-modal textarea.plib-saveas-natural { width: 100%; box-sizing: border-box; min-height: 60px; resize: vertical; padding: 8px 10px; border-radius: var(--plib-input-radius, 6px);
+  border: 1px solid var(--plib-border); background: var(--plib-input-bg); color: var(--plib-fg); font: inherit; font-size: 13px; line-height: 1.45; outline: none; }
+.plib-modal textarea.plib-saveas-natural:focus { border-color: var(--plib-accent); }
 /* current prompt details: tags + Reference Library collections (inline chip editors, saved immediately) */
 .plib-panel .plib-bar-meta:not(:has(.plib-meta)) { display: none !important; }
 .plib-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 2px 2px 0; min-width: 0; }
@@ -220,7 +293,7 @@
 .plib-meta-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm, 12px); font-weight: 600; color: var(--plib-label); opacity: .85; white-space: nowrap; }
 .plib-meta-label::before { content: ""; width: 14px; height: 14px; flex: 0 0 14px; background: var(--plib-acc);
   -webkit-mask: var(--plib-lab-icon) center / contain no-repeat; mask: var(--plib-lab-icon) center / contain no-repeat; }
-.plib-meta-label[data-kind="tags"] { --plib-lab-icon: var(--plib-icon-tag); } .plib-meta-label[data-kind="coll"] { --plib-lab-icon: var(--plib-icon-images); }
+.plib-meta-label[data-kind="tags"] { --plib-lab-icon: var(--plib-icon-tag); } .plib-meta-label[data-kind="coll"] { --plib-lab-icon: var(--plib-icon-images); } .plib-meta-label[data-kind="natural"] { --plib-lab-icon: var(--plib-icon-natural); }
 /* chip editor (bar details row and the Save as dialog share it) */
 .plib-cedit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .plib-echip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 4px 0 11px; border-radius: 13px; max-width: 100%; min-width: 0;
@@ -284,7 +357,11 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
 :root { --plib-icon-prompt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5h16v11H9l-5 4V5Z'/%3E%3Cpath d='M8 9h8M8 12h5'/%3E%3C/svg%3E");
   --plib-icon-save: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 3h12l4 4v14H3V3h2Zm2 0v7h10V3M7 21v-7h10v7'/%3E%3C/svg%3E");
   --plib-icon-saveas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 21H3V3h12l4 4v5M7 3v6h8V3M7 21v-6h5M18 15v6M15 18h6'/%3E%3C/svg%3E");
+  --plib-icon-natural: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M8 9h8M8 13h5'/%3E%3C/svg%3E");
   --plib-icon-history: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 3-6.7L3 8'/%3E%3Cpath d='M3 3v5h5M12 7v5l3 2'/%3E%3C/svg%3E");
+  --plib-icon-apply: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m5%2012%204%204L19%206%22/%3E%3C/svg%3E");
+  --plib-icon-rlsave: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%203h12l4%204v14H3V3h2Zm2%200v7h10V3M7%2021v-7h10v7%22/%3E%3C/svg%3E");
+  --plib-icon-refresh: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%207v5h-5M4%2017v-5h5M6%207a7%207%200%200%201%2012-1l2%206M4%2012l2%206a7%207%200%200%200%2012-1%22/%3E%3C/svg%3E");
   --plib-icon-manage: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1'/%3E%3Ccircle cx='15' cy='6' r='2'/%3E%3Ccircle cx='9' cy='12' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E");
   --plib-icon-tag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12V3h9l9 9-9 9-9-9Z'/%3E%3Ccircle cx='7.5' cy='7.5' r='1.5' fill='black'/%3E%3C/svg%3E"); }
 :root { --plib-icon-pen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4' fill='none' stroke='black' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E"); }
@@ -467,14 +544,16 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             const tags = fold((item.tags || []).join(" ") + " " + (item.category || ""));
             const body = fold(item.text);
             const colls = fold(linkedCollections(item).map(c => c.name).join(" "));
-            const all = `${title} ${tags} ${colls} ${body}`;
+            const nat = fold(item.natural || "");
+            const all = `${title} ${tags} ${colls} ${body} ${nat}`;
             if (words.length && !words.every(w => all.includes(w))) continue;
             const titleHits = words.reduce((n, w) => n + (title.includes(w) ? 1 : 0), 0);
             const tagHits = words.reduce((n, w) => n + (tags.includes(w) ? 1 : 0), 0);
             const collHits = words.reduce((n, w) => n + (colls.includes(w) ? 1 : 0), 0);
             const bodyHits = words.reduce((n, w) => n + (body.includes(w) ? 1 : 0), 0);
+            const natHits = words.reduce((n, w) => n + (nat.includes(w) ? 1 : 0), 0);
             scored.push({
-                rank: [-titleHits * 100 - tagHits * 40 - collHits * 30 - bodyHits * 10, -(item.last_used || 0), -(item.use_count || 0), -(item.updated || 0)],
+                rank: [-titleHits * 100 - tagHits * 40 - collHits * 30 - bodyHits * 10 - natHits * 5, -(item.last_used || 0), -(item.use_count || 0), -(item.updated || 0)],
                 item,
             });
         }
@@ -801,7 +880,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         const wrap = document.createElement("div");
         wrap.className = "plib-wrap plib-fallback";
         wrap.innerHTML = `<div class="plib-fb-row"><div class="plib-search-box"><input type="text" autocomplete="off" spellcheck="false" /></div>
-          <button type="button" class="plib-btn plib-save-btn"></button><button type="button" class="plib-btn plib-saveas-btn"></button>
+          <button type="button" class="plib-btn plib-apply-btn primary"></button><button type="button" class="plib-btn plib-saveas-btn"></button><button type="button" class="plib-btn plib-save-btn"></button>
           <button type="button" class="plib-btn plib-manage-btn"></button></div><div class="plib-fb-status"></div><div class="plib-fb-meta"></div>`;
         stack.parentElement.insertBefore(wrap, stack.nextSibling);
         return wrap;
@@ -846,12 +925,13 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         const saveAsBtn = wrap.querySelector(".plib-saveas-btn");
         const manageBtn = wrap.querySelector(".plib-manage-btn");
         const historyBtn = wrap.querySelector(".plib-history-btn");
+        const applyBtn = wrap.querySelector(".plib-apply-btn");
         const dd = document.createElement("div");
         dd.className = "plib-dd";
         dd.dataset.tab = tab;
         dd.setAttribute("role", "listbox");
         document.body.appendChild(dd);
-        const state = { tab, wrap, input, box, dd, saveBtn, saveAsBtn, manageBtn, historyBtn, clearBtn, renBtn, activeIdx: -1, results: [] };
+        const state = { tab, wrap, input, box, dd, saveBtn, saveAsBtn, manageBtn, historyBtn, applyBtn, clearBtn, renBtn, activeIdx: -1, results: [] };
         mounts.set(tab, state);
         relabel(state);
         const syncClear = () => clearBtn.classList.toggle("show", !!input.value && !state.showingCurrent && !state.renaming);
@@ -891,6 +971,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         if (saveAsBtn) saveAsBtn.addEventListener("click", () => onSaveAs(tab));
         if (manageBtn) manageBtn.addEventListener("click", openManageTab);
         if (historyBtn) historyBtn.addEventListener("click", () => openHistory(tab));
+        if (applyBtn) applyBtn.addEventListener("click", () => onApply(tab));
         dd.addEventListener("mousedown", (e) => e.preventDefault()); // keep focus in the input
         syncClear();
         updateBar(tab, true);
@@ -978,12 +1059,14 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         if (!state) return;
         state.input.placeholder = state.renaming ? t("rename_ph") : t("search_ph");
         const hideSave = cfg.save_current_button === false;
-        if (state.saveBtn) { state.saveBtn.textContent = t("save"); state.saveBtn.classList.toggle("plib-hide", hideSave); }
-        if (state.saveAsBtn) { state.saveAsBtn.textContent = t("save_as"); state.saveAsBtn.title = t("save_as_title"); state.saveAsBtn.classList.toggle("plib-hide", hideSave); }
+        if (state.saveBtn) { state.saveBtn.textContent = t("update"); state.saveBtn.classList.toggle("plib-hide", hideSave); }
+        if (state.saveAsBtn) { state.saveAsBtn.textContent = t("save_as"); state.saveAsBtn.title = t("tip_save_as"); state.saveAsBtn.classList.toggle("plib-hide", hideSave); }
+        if (state.applyBtn) state.applyBtn.textContent = t("apply");
+        state.input.title = t("tip_search");
         state.statusHtml = null; state.metaSig = null;
         updateBar(state.tab, true);
         if (state.manageBtn) { state.manageBtn.textContent = t("manage"); state.manageBtn.title = t("open_tab"); }
-        if (state.historyBtn) { state.historyBtn.textContent = t("history"); state.historyBtn.title = t("history_title"); }
+        if (state.historyBtn) { state.historyBtn.textContent = ""; state.historyBtn.title = t("history") + " · " + t("history_title"); state.historyBtn.setAttribute("aria-label", t("history")); }
         state.clearBtn && (state.clearBtn.title = t("clear"));
     }
     function openDropdown(state) {
@@ -1007,7 +1090,10 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         state.dd.innerHTML = results.map((item, i) => {
             const chips = linkedCollections(item).slice(0, 4).map(c => `<span class="plib-chip plib-coll-chip" title="${escapeHtml(t("collections"))}">${escapeHtml(c.name)}</span>`).join("")
                 + (item.tags || []).slice(0, 8).map(tag => `<span class="plib-chip">${escapeHtml(tag)}</span>`).join("");
-            const snip = highlightHtml(snippet(item, q, 220));
+            const natHit = naturalOnlyHit(item, q);
+            const snip = natHit
+                ? `<span class="plib-item-nat" title="${escapeHtml(t("natural_title"))}">${escapeHtml(t("natural_hit"))}</span>` + highlightHtml(snippet({ text: item.natural }, q, 200))
+                : highlightHtml(snippet(item, q, 220));
             return `<div class="plib-item${i === state.activeIdx ? " active" : ""}" data-i="${i}" role="option" title="${escapeHtml(item.title)}">
               <div class="plib-item-head"><div class="plib-item-title">${highlightHtml(titleHl(item.title, q))}</div></div>
               ${chips ? `<div class="plib-item-tags" aria-label="${escapeHtml(t("tags"))}">${chips}</div>` : ""}
@@ -1022,6 +1108,13 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             });
         });
         openDropdown(state);
+    }
+    function naturalOnlyHit(item, q) {
+        // A query word found in the natural description but nowhere else (title / tags / collections / prompt text).
+        const nat = fold(item.natural || "");
+        if (!nat) return false;
+        const rest = fold(`${item.title} ${(item.tags || []).join(" ")} ${item.category || ""} ${linkedCollections(item).map(c => c.name).join(" ")} ${item.text}`);
+        return fold(q).split(/\s+/).filter(Boolean).some(w => nat.includes(w) && !rest.includes(w));
     }
     function titleHl(title, q) {
         // mark the first matching query word in the title (accent-insensitive)
@@ -1176,6 +1269,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         return current.get(tab);
     }
     function setCurrent(tab, cur) {
+        naturalDraft.delete(tab);
         cur = cur && cur.id ? { id: String(cur.id), rendered: typeof cur.rendered === "string" ? cur.rendered : null } : null;
         current.set(tab, cur);
         try { cur ? sessionStorage.setItem(SS_KEY(tab), JSON.stringify(cur)) : sessionStorage.removeItem(SS_KEY(tab)); } catch (_) {}
@@ -1192,11 +1286,23 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         return c ? library.find(p => p.id === c.id) || null : null;
     }
     const normText = (v) => String(v == null ? "" : v).replace(/\r\n/g, "\n").replace(/\s+$/, "");
-    function isModified(tab) {
+    function textModified(tab) {
         const c = getCurrent(tab), item = currentItem(tab);
         if (!item) return false;
         return normText(readPromptValue(tab)) !== normText(c.rendered != null ? c.rendered : item.text);
     }
+    // Natural-language description (1.4.0): edited in the bar as a per-tab draft of the loaded prompt's `natural`;
+    // saved by Actualizar / Guardar como… like the prompt text, and part of "modificado".
+    const naturalDraft = new Map(); // tab -> { id, value }
+    function naturalOf(tab, item) {
+        const d = naturalDraft.get(tab);
+        return item && d && d.id === item.id ? d.value : String((item && item.natural) || "");
+    }
+    function naturalModified(tab) {
+        const item = currentItem(tab);
+        return !!item && normText(naturalOf(tab, item)) !== normText(item.natural || "");
+    }
+    function isModified(tab) { return textModified(tab) || naturalModified(tab); }
     function statusEl(state) {
         const el = document.getElementById("plib_bar_status_" + state.tab) || state.wrap.querySelector(".plib-fb-status");
         return el ? (el.querySelector(".prose") || el) : null;
@@ -1232,7 +1338,10 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         state.wrap.dataset.modified = modified ? "1" : "0";
         if (state.saveBtn) {
             state.saveBtn.classList.toggle("plib-attn", modified);
-            state.saveBtn.title = item ? t("save_title", { title: item.title }) : t("save_none_title");
+            state.saveBtn.title = item ? t("tip_update", { title: item.title }) : t("tip_update_none");
+        }
+        if (state.applyBtn) {
+            state.applyBtn.title = item ? t("tip_apply") : t("tip_apply_none");
         }
         renderMeta(state, item, force);
     }
@@ -1240,7 +1349,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
     // ---- details row: tags + collections of the current prompt, edited inline and saved immediately (with Undo)
     function visibleLinks(item) { return linkedCollections(item).map(c => c.id); }
     function metaSig(item) {
-        return item ? JSON.stringify([item.id, item.tags || [], collections ? visibleLinks(item) : null, lang()]) : "";
+        return item ? JSON.stringify([item.id, item.tags || [], collections ? visibleLinks(item) : null, lang(), item.natural || ""]) : "";
     }
     function renderMeta(state, item, force) {
         const box = metaEl(state);
@@ -1252,6 +1361,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         if (state.metaPending > 0 && sig !== "" && box.querySelector(".plib-meta")) return;
         state.metaSig = sig;
         const focused = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.kind : null;
+        const natFocus = focused === "natural" ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
         (state.editors || []).forEach(ed => ed.destroy());
         state.editors = [];
         box.innerHTML = "";
@@ -1286,8 +1396,73 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
                 },
             }));
         }
+        group("natural", t("natural"), naturalEditor(state, item));
         box.appendChild(row);
-        if (focused) { const inp = box.querySelector(`input.plib-echip-add[data-kind="${focused}"]`); if (inp) inp.focus(); }
+        if (focused === "natural" && natFocus) {
+            const ta = box.querySelector("textarea.plib-nat-ta");
+            if (ta) { ta.focus(); try { ta.setSelectionRange(natFocus[0], natFocus[1]); } catch (_) {} }
+        } else if (focused) { const inp = box.querySelector(`input.plib-echip-add[data-kind="${focused}"]`); if (inp) inp.focus(); }
+    }
+    function naturalEditor(state, item) {
+        const tab = state.tab;
+        const el = document.createElement("div");
+        el.className = "plib-nat" + (state.natOpen ? " open" : "");
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "plib-nat-toggle";
+        toggle.title = t("natural_title");
+        const edit = document.createElement("div");
+        edit.className = "plib-nat-edit";
+        const ta = document.createElement("textarea");
+        ta.className = "plib-nat-ta";
+        ta.dataset.kind = "natural";
+        ta.rows = 3;
+        ta.placeholder = t("natural_ph");
+        ta.title = t("natural_title");
+        ta.value = naturalOf(tab, item);
+        const acts = document.createElement("div");
+        acts.className = "plib-nat-acts";
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "plib-nat-copy";
+        copy.textContent = t("natural_copy");
+        copy.title = t("natural_copy_title");
+        acts.appendChild(copy);
+        edit.append(ta, acts);
+        el.append(toggle, edit);
+        const syncToggle = () => {
+            const v = ta.value.replace(/\s+/g, " ").trim();
+            toggle.textContent = v || t("natural_add");
+            toggle.classList.toggle("plib-nat-empty", !v);
+        };
+        syncToggle();
+        const setOpen = (open) => { state.natOpen = open; el.classList.toggle("open", open); if (open) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } };
+        toggle.addEventListener("click", () => setOpen(true));
+        ta.addEventListener("input", () => { naturalDraft.set(tab, { id: item.id, value: ta.value }); syncToggle(); updateBar(tab); });
+        ta.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setOpen(false); toggle.focus(); } });
+        copy.addEventListener("mousedown", (e) => e.preventDefault());
+        copy.addEventListener("click", async () => {
+            const text = ta.value;
+            if (!text.trim()) { toast(t("natural_empty"), "error"); return; }
+            try {
+                await sendBridge({ action: "insert", tab, field: fieldOf(visiblePromptRoot(tab)), text, title: t("natural_entry"), mode: "replace", current: readPromptValue(tab) });
+            } catch (e) { toast(String(e.message || e), "error"); }
+            setTimeout(() => updateBar(tab), 400);
+        });
+        return { el, destroy: () => {} };
+    }
+    async function onApply(tab) {
+        const item = currentItem(tab);
+        if (!item) {
+            toast(t("apply_none"), "info");
+            const st = mounts.get(tab);
+            if (st) st.input.focus();
+            return;
+        }
+        const prevNatural = naturalDraft.get(tab);
+        await applyPromptById(item.id, { tab, source: "apply" });
+        // Aplicar re-loads the model prompt only; a natural-text draft being edited is kept.
+        if (prevNatural && prevNatural.id === item.id) { naturalDraft.set(tab, prevNatural); updateBar(tab, true); }
     }
     async function renameTag(tab, oldName, newName) {
         try { await sendBridge({ action: "rename_tag", tab, old: oldName, new: newName }); }
@@ -1443,13 +1618,17 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
         const text = readPromptValue(tab);
         if (!String(text || "").trim()) { toast(t("empty_prompt"), "error"); return; }
         if (!isModified(tab)) { toast(t("no_changes", { title: item.title }), "info"); return; }
-        if (item.vars && item.vars.length && !item.vars.some(v => text.includes("{" + v + "}"))) {
+        const textChanged = textModified(tab);
+        const natural = naturalOf(tab, item);
+        if (textChanged && item.vars && item.vars.length && !item.vars.some(v => text.includes("{" + v + "}"))) {
             const ok = await askConfirm(t("tpl_confirm", { title: item.title, vars: item.vars.map(v => "{" + v + "}").join(", ") }), t("overwrite"));
             if (!ok) return;
         }
         try {
-            const r = await sendBridge({ action: "update_text", tab, id: item.id, field: fieldOf(visiblePromptRoot(tab)), text });
-            if (r && r.ok) setCurrent(tab, { id: item.id, rendered: null });
+            const keepRendered = !textChanged ? getCurrent(tab).rendered : null;
+            const r = await sendBridge({ action: "update_text", tab, id: item.id, field: fieldOf(visiblePromptRoot(tab)),
+                text: textChanged ? text : item.text, natural });
+            if (r && r.ok) setCurrent(tab, { id: item.id, rendered: keepRendered });
         } catch (e) { toast(String(e.message || e), "error"); }
     }
     async function onSaveAs(tab) {
@@ -1460,6 +1639,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             title: item ? t("copy_title", { title: item.title }) : text.split("\n")[0].slice(0, 60),
             tags: item ? item.tags || [] : [],
             colls: item && collections ? visibleLinks(item) : [],
+            natural: item ? naturalOf(tab, item) : "",
             text,
         });
         if (!res) return;
@@ -1467,7 +1647,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             const prev = getCurrent(tab);
             const r = await sendBridge({
                 action: "save_as", tab, field: fieldOf(visiblePromptRoot(tab)), text, title: res.title, tags: res.tags,
-                collections: collections ? res.colls : undefined, from_id: item ? item.id : null,
+                collections: collections ? res.colls : undefined, from_id: item ? item.id : null, natural: res.natural,
             });
             if (r && r.ok && r.item) {
                 if (r.save_undo_id) saveUndoCtx.set(r.save_undo_id, { tab, prev });
@@ -1548,6 +1728,13 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
                     labelOf: (v) => (collById.get(v) || {}).name || v, emptyText: t("no_suggestions") });
                 modal.appendChild(collEd.el);
             }
+            lab(t("natural_label"));
+            const nat = document.createElement("textarea");
+            nat.className = "plib-saveas-natural";
+            nat.rows = 3;
+            nat.placeholder = t("natural_ph");
+            nat.value = init.natural || "";
+            modal.appendChild(nat);
             lab(init.textLabel || t("text_label"));
             const pre = document.createElement("div");
             pre.className = "plib-saveas-text";
@@ -1561,7 +1748,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             const done = (v) => { tagsEd.destroy(); collEd && collEd.destroy(); bg.remove(); resolve(v); };
             cancel.addEventListener("click", () => done(null));
             bg.addEventListener("mousedown", (e) => { if (e.target === bg) done(null); });
-            ok.addEventListener("click", () => done({ title: inp.value.trim() || init.title, tags: tagsEd.get(), colls: collEd ? collEd.get() : [] }));
+            ok.addEventListener("click", () => done({ title: inp.value.trim() || init.title, tags: tagsEd.get(), colls: collEd ? collEd.get() : [], natural: nat.value }));
             inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); ok.click(); } });
             modal.addEventListener("keydown", (e) => { if (e.key === "Escape") done(null); });
         });
@@ -1671,10 +1858,10 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             } catch (err) { toast(String(err.message || err), "error"); }
         }
         async function saveHistory(e) {
-            const res = await askSaveAs({ title: e.text.split("\n")[0].slice(0, 60), tags: [], colls: [], text: e.text, textLabel: t("hist_text_label") });
+            const res = await askSaveAs({ title: e.text.split("\n")[0].slice(0, 60), tags: [], colls: [], natural: "", text: e.text, textLabel: t("hist_text_label") });
             if (!res) return;
             try {
-                const r = await sendBridge({ action: "save_as", tab, text: e.text, title: res.title, tags: res.tags, collections: collections ? res.colls : undefined });
+                const r = await sendBridge({ action: "save_as", tab, text: e.text, title: res.title, tags: res.tags, collections: collections ? res.colls : undefined, natural: res.natural });
                 if (r && r.ok && r.item && normText(readPromptValue(tab)) === normText(e.text)) setCurrent(tab, { id: r.item.id, rendered: null });
             } catch (err) { toast(String(err.message || err), "error"); }
         }
@@ -1757,6 +1944,7 @@ input.plib-echip-add:focus { box-shadow: inset 0 0 0 1px var(--plib-acc, var(--p
             const tokens = [...document.querySelectorAll("#plib_mgr_collections .token")].map(x => x.textContent.trim()).sort();
             const prevColls = linkedCollections(prev).map(c => c.name).sort();
             const clean = boxVal("plib_mgr_title") === prev.title && normText(boxVal("plib_mgr_text")) === normText(prev.text)
+                && normText(boxVal("plib_mgr_natural") || "") === normText(prev.natural || "")
                 && fold(boxVal("plib_mgr_tags") || "").replace(/\s+/g, "") === fold((prev.tags || []).join(",")).replace(/\s+/g, "")
                 && (!collections || JSON.stringify(tokens) === JSON.stringify(prevColls));
             if (clean) mgrFlag = "reload";

@@ -16,7 +16,7 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 ## Features
 
 **Autocomplete search**
-- A **Prompt Library** bar sits right under WanGP's main prompt (and in the queue **Edit** tab if enabled). It follows the same style as Reference Library's bar: a header with an icon and a status on the right, the search field (placeholder + clear ×), and the **Save**, **Save as…** and **Manage** buttons. It is built from regular Gradio components, so it follows WanGP's **dark and light themes**.
+- A **Prompt Library** bar sits right under WanGP's main prompt (and in the queue **Edit** tab if enabled). It follows the same style as Reference Library's bar: a header with an icon and a status on the right, the search field (placeholder + clear ×), and the same buttons as Reference Library's bar: **Apply**, **Save as…**, **Update** and **Manage**, plus an icon-only **History** square. It is built from regular Gradio components, so it follows WanGP's **dark and light themes**.
 - Multi-word queries use **AND**: every word must match somewhere in the title, tags or body.
 - Matching is **case-insensitive and accent-insensitive** (`cancion` finds `canción`). Partial words are fine.
 - Ranking: title matches first, then tags, then body text; then by last used / use count.
@@ -29,9 +29,10 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 - Optional **Undo** toast for a few seconds after inserting.
 - Simple template variables like `{subject}` open a small dialog to fill values before insert.
 
-**Current prompt, Save and Save as… (1.2.0)**
+**Current prompt, Apply, Update and Save as… (1.2.0, renamed in 1.4.0)**
 - The bar remembers the prompt you loaded, whether you picked it from the autocomplete or another plugin applied it (`promptlib:apply`, e.g. a Reference Library chip). It is kept per browser session and per tab (Generate / Edit). The header shows **Prompt “X” loaded**, plus a **modified** marker while WanGP's prompt differs from the saved text. For a template, the comparison uses the values you filled in.
-- **Save** overwrites the loaded prompt with WanGP's current text. The toast has **Undo**. If nothing is loaded, Save works like *Save as…*. If there are no changes, it just says so. If you save over a template whose `{variables}` are gone from the text, it asks first.
+- **Apply** loads the current prompt into WanGP's prompt again (discarding unsaved edits there).
+- **Update** (called *Save* before 1.4.0) overwrites the loaded prompt with WanGP's current text. The toast has **Undo**. If nothing is loaded, Update works like *Save as…*. If there are no changes, it just says so. If you save over a template whose `{variables}` are gone from the text, it asks first.
 - **Save as…** creates a **new** prompt from the current text and leaves the loaded one unchanged. Its dialog has the title (prefilled “X (copy)”), the tags and the Reference Library collections of the loaded prompt as a starting point, and a preview of the text. The new prompt becomes the current one. **Undo** in the toast deletes it again.
 - **Inline details:** under the bar, the current prompt's **tags** are chips with × plus a “+ tag” field that autocompletes from your existing tags. When Reference Library 1.1+ is present, its **collections** get the same editor, with a picker limited to the existing collections. Changes are saved immediately and the toast has **Undo**. The *Save as…* dialog uses the same chip editors, but there nothing is saved until you confirm.
 - **The search box shows the loaded prompt (1.2.1):** when idle, it displays the loaded prompt's title as its value. Focusing selects the title so typing searches as usual; Esc or clicking away without a pick brings the title back. **Rename** it with the small pencil inside the box (next to the clear ×) or by double-clicking the box. The box turns amber and shows *Rename prompt…* with no dropdown. Enter saves, Esc cancels, and an empty title is rejected. This renames **that** prompt: same id, with text, tags and collections untouched. The toast has **Undo**, and the manager, the autocomplete and Reference Library's chips refresh. In the status, long titles are truncated with an ellipsis.
@@ -47,10 +48,19 @@ It is a regular WanGP plugin. It doesn't modify any core WanGP file, so it survi
 **Starter examples**
 - The first run creates three prompts titled `[Example] …`. Delete them whenever you like; they are only seeds.
 
+## Natural-language description (1.4.0)
+
+Each prompt can keep an optional plain-language description of the idea next to its model-specific text. For example, keep “a woman walking in neon rain at night, melancholic” next to the H3-tuned prompt. It is model-agnostic.
+
+- **Bar:** the **Natural** row under the tags shows a preview, or *+ description*. Click it to edit inline. Edits mark the prompt *modified*; **Update** or **Save as…** saves them, and Esc collapses the editor. **Copy to prompt** puts the description into WanGP's prompt. **Apply** always loads the model prompt, never the description.
+- **Save as…** (also when saving from the history) and the **manager** have a *Natural-language description (optional)* field.
+- **Search** matches the description too. A result found only there carries an *in the natural description* hint and a snippet.
+- Stored as `natural` in `library.json`. Older libraries load as-is, and `list_prompts()` / `get_prompt()` include it.
+
 ## Prompt history (1.3.0)
 
 Every prompt you actually use is recorded: when you click WanGP's **Generate** (or **Add New Prompt To Queue**), the text in the visible prompt box goes to the history.
-- Open it with **History** in the bar. Entries are newest first, each with its date. Search uses the same accent- and case-insensitive multi-word matching as the bar, and matches are highlighted.
+- Open it with the **History** icon (the clock square at the end of the bar buttons). Entries are newest first, each with its date. Search uses the same accent- and case-insensitive multi-word matching as the bar, and matches are highlighted.
 - Each entry has three actions:
   - **Apply** loads it into WanGP's prompt.
   - **Save to library** opens the usual *Save as…* dialog, prefilled.
@@ -82,12 +92,12 @@ Links live only in Prompt Library's `library.json` (`collections: [collection id
 
 | Function | Returns / does |
 |---|---|
-| `list_prompts()` | `[{id, title, preview, tags, collections}]` |
+| `list_prompts()` | `[{id, title, preview, tags, collections, natural}]` (`natural` since 1.4.0) |
 | `prompts_for_collection(cid)` | `[prompt ids]` |
 | `set_collection_prompts(cid, prompt_ids)` | makes exactly those prompts linked to `cid`; other links untouched; unknown ids ignored; returns the result |
 | `collections_for_prompt(pid)` | `[collection ids]` |
 | `set_prompt_collections(pid, cids)` | replaces one prompt's links |
-| `get_prompt(pid)` | `{id, title, text, tags, collections}` or `None` |
+| `get_prompt(pid)` | `{id, title, text, natural, tags, collections}` or `None` |
 | `revision()` | change counter |
 
 Invalid ids raise `ValueError`. Look the module up at call time, because plugin load order is not guaranteed.
@@ -115,7 +125,7 @@ Prompt Library consumes `sys.modules["wan2gp_reference_library_api"]` (any `API_
 | Language / Idioma | *Auto (browser language)*, *English* or *Español* | Auto |
 | Show search box next to the prompt | master switch for the autocomplete UI | on |
 | Also show it in the queue Edit tab | mount the search UI in Edit too | on |
-| “Save” / “Save as…” buttons in the bar | show the two save buttons | on |
+| “Update” / “Save as…” buttons in the bar | show the two save buttons | on |
 | How to insert | *Replace* / *Append* / *Insert at cursor* | Replace |
 | Offer “Undo” after inserting | undo toast | on |
 | Confirmation messages + Duration | toasts (errors always show) | on, 3.5 s |

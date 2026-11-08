@@ -17,7 +17,8 @@ Schema:
         "updated": 1696...,
         "use_count": 0,
         "last_used": null,
-        "collections": ["<Reference Library collection id>", ...]   # since 1.1.0 (schema 2)
+        "collections": ["<Reference Library collection id>", ...],  # since 1.1.0 (schema 2)
+        "natural": "the idea in plain words"   # since 1.4.0, optional ("" = none; missing in older files)
       },
       ...
     ]
@@ -202,6 +203,17 @@ def _empty_library() -> Dict[str, Any]:
     return {"version": LIBRARY_VERSION, "prompts": []}
 
 
+NATURAL_MAX = 20000
+
+
+def _normalize_natural(value: Any) -> str:
+    """Optional natural-language description (1.4.0): the human idea behind the model-ready prompt."""
+    if not isinstance(value, str):
+        return ""
+    value = value.replace("\r\n", "\n")
+    return value[:NATURAL_MAX] if value.strip() else ""
+
+
 def _coerce_prompt(raw: Any) -> Optional[Dict[str, Any]]:
     if not isinstance(raw, dict):
         return None
@@ -246,6 +258,7 @@ def _coerce_prompt(raw: Any) -> Optional[Dict[str, Any]]:
         "use_count": use_count,
         "last_used": last_used,
         "collections": _normalize_collections(raw.get("collections")),
+        "natural": _normalize_natural(raw.get("natural")),
     }
 
 
@@ -326,6 +339,7 @@ def create_prompt(
     category: str = "",
     path: Optional[str] = None,
     collections=None,
+    natural: str = "",
 ) -> Dict[str, Any]:
     title = _safe_title(title, fallback="")
     text = str(text or "")
@@ -345,6 +359,7 @@ def create_prompt(
         "use_count": 0,
         "last_used": None,
         "collections": _normalize_collections(collections),
+        "natural": _normalize_natural(natural),
     }
     with _lock:
         lib = load_library(path)
@@ -361,6 +376,7 @@ def update_prompt(
     tags=None,
     category: Optional[str] = None,
     collections=None,
+    natural: Optional[str] = None,
     path: Optional[str] = None,
 ) -> Dict[str, Any]:
     pid = _check_id(prompt_id)
@@ -379,6 +395,8 @@ def update_prompt(
                 item["category"] = _normalize_category(category)
             if collections is not None:
                 item["collections"] = _normalize_collections(collections)
+            if natural is not None:
+                item["natural"] = _normalize_natural(natural)
             item["updated"] = _now()
             lib["prompts"][i] = item
             save_library(lib, path, "update", pid)
@@ -395,6 +413,7 @@ def duplicate_prompt(prompt_id: str, path: Optional[str] = None) -> Dict[str, An
         category=src.get("category") or "",
         path=path,
         collections=list(src.get("collections") or []),
+        natural=src.get("natural") or "",
     )
 
 
@@ -665,6 +684,14 @@ def _haystacks(item: Dict[str, Any]) -> Tuple[str, str, str]:
     return title, (tags + " " + category).strip(), body
 
 
+def natural_only_hit(item: Dict[str, Any], query: str) -> bool:
+    """True when some query word is found only in the natural description (search hint)."""
+    words = [w for w in _WORD_SPLIT.split(_fold(query)) if w]
+    title, tags, body = _haystacks(item)
+    nat = _fold(item.get("natural") or "")
+    return bool(nat) and any(w in nat and w not in f"{title} {tags} {body}" for w in words)
+
+
 def search_prompts(
     query: str,
     prompts: Optional[List[Dict[str, Any]]] = None,
@@ -681,16 +708,18 @@ def search_prompts(
     for item in items:
         title, tags, body = _haystacks(item)
         colls = _fold(" ".join(names[c] for c in (item.get("collections") or []) if c in names))
-        all_text = f"{title} {tags} {colls} {body}"
+        nat = _fold(item.get("natural") or "")
+        all_text = f"{title} {tags} {colls} {body} {nat}"
         if words and not all(w in all_text for w in words):
             continue
         title_hits = sum(1 for w in words if w in title) if words else 0
         tag_hits = sum(1 for w in words if w in tags) if words else 0
         coll_hits = sum(1 for w in words if w in colls) if words else 0
         body_hits = sum(1 for w in words if w in body) if words else 0
+        nat_hits = sum(1 for w in words if w in nat) if words else 0
         # empty query: browse by recent/frequent
         rank = (
-            -title_hits * 100 - tag_hits * 40 - coll_hits * 30 - body_hits * 10,
+            -title_hits * 100 - tag_hits * 40 - coll_hits * 30 - body_hits * 10 - nat_hits * 5,
             -(item.get("last_used") or 0),
             -(item.get("use_count") or 0),
             -(item.get("updated") or 0),
@@ -742,6 +771,7 @@ def client_payload(path: Optional[str] = None) -> List[Dict[str, Any]]:
             "updated": item.get("updated"),
             "vars": find_variables(item.get("text") or ""),
             "collections": list(item.get("collections") or []),
+            "natural": item.get("natural") or "",
         })
     return out
 
